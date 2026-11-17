@@ -9,6 +9,9 @@ export const DEFAULT_FILTERS: Filters = {
   safety: 1,
   beauty: 1,
   minYalies: 0,
+  warmth: 0,
+  features: [],
+  continents: [],
   query: "",
   scope: "all",
 };
@@ -34,7 +37,9 @@ export type State = {
 const SEASONS = new Set<Season>(["spring", "summer", "fall", "winter", "weekend"]);
 const SORTS = new Set<SortKey>(["yalies", "overall", "affordability", "safety", "beauty"]);
 const SCOPES = new Set<Scope>(["all", "countries", "us"]);
-const VIEWS = new Set<ViewName>(["map", "friends", "itinerary"]);
+const VIEWS = new Set<ViewName>(["map", "catalog", "friends", "itinerary"]);
+const FEATURE_IDS = new Set(["beach", "mountain", "city", "island", "desert", "food"]);
+const CONTINENT_NAMES = new Set(["North America", "Caribbean", "Central America", "South America", "Europe", "Africa", "Asia", "Oceania"]);
 
 function defaultState(): State {
   return {
@@ -87,8 +92,12 @@ function loadState(): State {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return base;
     const data = JSON.parse(raw) as Partial<State>;
-    const filters = { ...base.filters, ...(data.filters ?? {}) };
+    const incoming = data.filters ?? base.filters;
+    const filters = { ...base.filters, ...incoming };
     if (!SCOPES.has(filters.scope)) filters.scope = "all";
+    filters.features = Array.isArray(incoming.features) ? incoming.features.filter((id) => FEATURE_IDS.has(id)) : [];
+    filters.continents = Array.isArray(incoming.continents) ? incoming.continents.filter((name) => CONTINENT_NAMES.has(name)) : [];
+    if (typeof incoming.warmth !== "number") filters.warmth = 0;
     return {
       ...base,
       theme: data.theme === "dark" ? "dark" : "light",
@@ -144,7 +153,12 @@ function reducer(state: State, action: Action): State {
     case "patchFilters":
       return { ...state, filters: { ...state.filters, ...action.patch } };
     case "select":
-      return { ...state, selectedId: action.id, emptyGeo: null, view: action.id ? "map" : state.view };
+      return {
+        ...state,
+        selectedId: action.id,
+        emptyGeo: null,
+        view: state.view === "catalog" ? "catalog" : action.id ? "map" : state.view,
+      };
     case "selectEmpty":
       return { ...state, selectedId: null, emptyGeo: { iso: action.iso, name: action.name }, view: "map" };
     case "world":
@@ -239,7 +253,7 @@ export function useCatalog(): {
   return useMemo(() => {
     const rows = [...PLACE_BY_ID.values()]
       .map((place) => ({ place, count: visitCount(place, state.season) }))
-      .filter((row) => passesFilters(row.place, row.count, state.filters));
+      .filter((row) => passesFilters(row.place, row.count, state.filters, state.season));
     rows.sort((a, b) => {
       if (state.sort === "yalies") return b.count - a.count || b.place.scores.overall - a.place.scores.overall;
       return sortScore(b.place.scores, state.sort) - sortScore(a.place.scores, state.sort) || b.count - a.count;

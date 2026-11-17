@@ -76,7 +76,7 @@ export type Person = {
 export type Scope = "all" | "countries" | "us";
 export type SortKey = "yalies" | "overall" | "affordability" | "safety" | "beauty";
 export type ThemeName = "light" | "dark";
-export type ViewName = "map" | "friends" | "itinerary";
+export type ViewName = "map" | "catalog" | "friends" | "itinerary";
 
 export type Filters = {
   overall: number;
@@ -84,6 +84,9 @@ export type Filters = {
   safety: number;
   beauty: number;
   minYalies: number;
+  warmth: number;
+  features: string[];
+  continents: string[];
   query: string;
   scope: Scope;
 };

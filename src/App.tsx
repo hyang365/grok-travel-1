@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { assertData } from "./data";
 import { seasonLabel } from "./logic";
 import { MapView } from "./MapView";
-import { EmptyPanel, FilterRail, FriendsView, ItineraryView, PlacePanel } from "./ui";
+import { CatalogView, EmptyPanel, FilterRail, FriendsView, ItineraryView, PlacePanel } from "./ui";
 import { StoreProvider, useCatalog, useTripTable } from "./store";
 import { PLACE_BY_ID } from "./data";
 
@@ -84,6 +84,12 @@ function Shell() {
           <button className="filters-toggle" type="button" onClick={() => setRailOpen((open) => !open)}>
             Filters
           </button>
+          <button className={state.view === "map" ? "nav-btn active" : "nav-btn"} type="button" onClick={() => dispatch({ type: "setView", view: "map" })}>
+            Map
+          </button>
+          <button className={state.view === "catalog" ? "nav-btn active" : "nav-btn"} type="button" onClick={() => dispatch({ type: "setView", view: "catalog" })}>
+            Catalog
+          </button>
           <button
             className={state.view === "friends" ? "nav-btn active" : "nav-btn"}
             type="button"
@@ -132,6 +138,15 @@ function Shell() {
             </div>
             {selected ? <PlacePanel place={selected} /> : null}
             {state.emptyGeo ? <EmptyPanel geo={state.emptyGeo} /> : null}
+          </div>
+        </div>
+      ) : null}
+      {state.view === "catalog" ? (
+        <div className="workspace">
+          <FilterRail open={railOpen} onPick={() => setRailOpen(false)} />
+          <div className={panelOpen ? "map-stage catalog-stage panel-open" : "map-stage catalog-stage"}>
+            <CatalogView />
+            {selected ? <PlacePanel place={selected} /> : null}
           </div>
         </div>
       ) : null}

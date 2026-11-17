@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { DIRECTORY, ME, PLACE_BY_ID, PLACES, SUGGESTED_NETIDS } from "./data";
 import {
   anonymousOverlap,
+  averageTempC,
+  continentsOf,
+  CONTINENTS,
+  FEATURES,
   filtersAreDefault,
   formatMoney,
   formatRange,
@@ -9,7 +13,11 @@ import {
   parseISODate,
   ratingBand,
   seasonLabel,
+  tempBand,
+  TEMP_LABELS,
+  travelGuidance,
   visitCount,
+  warmthLabel,
   CURRENT_YEAR,
   SEASONS,
 } from "./logic";
@@ -61,6 +69,24 @@ function Slider({
 
 function thresholdLabel(value: number): string {
   return value <= 1 ? "Any" : `≥ ${value.toFixed(1)}`;
+}
+
+function toggleValue(current: string[], value: string): string[] {
+  return current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
+}
+
+export function TravelLinks({ name }: { name: string }) {
+  const flights = `https://www.google.com/travel/flights?q=${encodeURIComponent(`Flights to ${name}`)}`;
+  return (
+    <p className="travel-links">
+      <a href={flights} target="_blank" rel="noreferrer">
+        Book travel
+      </a>
+      <a href="https://www.yideshare.com/" target="_blank" rel="noreferrer">
+        YiDeShare rides
+      </a>
+    </p>
+  );
 }
 
 export function FilterRail({ open, onPick }: { open: boolean; onPick: () => void }) {
@@ -127,6 +153,42 @@ export function FilterRail({ open, onPick }: { open: boolean; onPick: () => void
           display={filters.minYalies === 0 ? "Any" : `≥ ${filters.minYalies}`}
           onChange={(value) => dispatch({ type: "patchFilters", patch: { minYalies: value } })}
         />
+        <Slider
+          label="Weather"
+          min={0}
+          max={5}
+          step={1}
+          value={filters.warmth}
+          display={warmthLabel(filters.warmth)}
+          onChange={(value) => dispatch({ type: "patchFilters", patch: { warmth: Math.round(value) } })}
+        />
+        <p className="fine">Typical {seasonLabel(state.season).toLowerCase()} weather, very cold to very hot. Generated from latitude, not a forecast.</p>
+        <p className="field-label">Features</p>
+        <div className="choice-row">
+          {FEATURES.map((feature) => (
+            <button
+              key={feature.id}
+              type="button"
+              className={filters.features.includes(feature.id) ? "on" : ""}
+              onClick={() => dispatch({ type: "patchFilters", patch: { features: toggleValue(filters.features, feature.id) } })}
+            >
+              {feature.label}
+            </button>
+          ))}
+        </div>
+        <p className="field-label">Continent</p>
+        <div className="choice-row">
+          {CONTINENTS.map((name) => (
+            <button
+              key={name}
+              type="button"
+              className={filters.continents.includes(name) ? "on" : ""}
+              onClick={() => dispatch({ type: "patchFilters", patch: { continents: toggleValue(filters.continents, name) } })}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
         <label className="check">
           <input type="checkbox" checked={state.showFriends} onChange={() => dispatch({ type: "toggleFriends" })} />
           Show friends on the map
@@ -209,6 +271,11 @@ export function PlacePanel({ place }: { place: Place }) {
           </button>
         </div>
         <p className="blurb">{place.blurb}</p>
+        <TravelLinks name={place.name} />
+        <GuidanceNote iso={place.iso} />
+        <p className="fine">
+          {TEMP_LABELS[tempBand(averageTempC(place.lat, state.season))]} in {seasonLabel(state.season).toLowerCase()} · {continentsOf(place).join(" and ")}
+        </p>
         <ul className="tags">
           {place.atlas ? <li className="tag atlas-tag">Micro</li> : null}
           {place.tags.map((tag) => (
@@ -400,6 +467,7 @@ function PlanForm({ place }: { place: Place }) {
   }, [place.id, existing, state.season]);
 
   const invalid = parseISODate(end) < parseISODate(start);
+  const blocked = travelGuidance(place.iso).level === "blocked";
 
   function useBusiest() {
     const peak = peakFor(season);
@@ -413,7 +481,7 @@ function PlanForm({ place }: { place: Place }) {
       className="plan"
       onSubmit={(event) => {
         event.preventDefault();
-        if (invalid) return;
+        if (invalid || blocked) return;
         dispatch({
           type: "saveTrip",
           trip: {
@@ -452,6 +520,7 @@ function PlanForm({ place }: { place: Place }) {
         Use the busiest logged week
       </button>
       {invalid ? <p className="form-error">End date is before the start date.</p> : null}
+      {blocked ? <p className="form-error">Yale College will not sponsor undergraduate travel here.</p> : null}
       <label>
         Note
         <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} placeholder="Where you are staying, who has the reservation" />
@@ -476,7 +545,7 @@ function PlanForm({ place }: { place: Place }) {
         ))}
       </fieldset>
       <div className="plan-actions">
-        <button className="primary" type="submit" disabled={invalid}>
+        <button className="primary" type="submit" disabled={invalid || blocked}>
           {existing ? "Update itinerary" : "Add to itinerary"}
         </button>
         {existing ? (
@@ -486,6 +555,15 @@ function PlanForm({ place }: { place: Place }) {
         ) : null}
       </div>
     </form>
+  );
+}
+
+function GuidanceNote({ iso }: { iso: string }) {
+  const guidance = travelGuidance(iso);
+  return (
+    <p className={`guidance ${guidance.level}`}>
+      <strong>{guidance.title}.</strong> {guidance.detail}
+    </p>
   );
 }
 
@@ -503,9 +581,58 @@ export function EmptyPanel({ geo }: { geo: { iso: string; name: string } }) {
             ×
           </button>
         </div>
+        <GuidanceNote iso={geo.iso} />
         <p className="guide">No Yale trips are logged here yet. The public map only colors places students have rated.</p>
+        <TravelLinks name={geo.name} />
       </div>
     </aside>
+  );
+}
+
+export function CatalogView() {
+  const { state, dispatch } = useTripTable();
+  const { rows } = useCatalog();
+  return (
+    <div className="catalog">
+      {rows.length === 0 ? <p className="empty">Nothing clears these filters.</p> : null}
+      <table className="catalog-table">
+        <thead>
+          <tr>
+            <th>Place</th>
+            <th>Weather</th>
+            <th>Yalies</th>
+            <th>Overall</th>
+            <th>Yale rules</th>
+            <th>Go</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ place, count }) => {
+            const guidance = travelGuidance(place.iso);
+            const band = tempBand(averageTempC(place.lat, state.season));
+            return (
+              <tr key={place.id} className={state.selectedId === place.id ? "active" : ""} onClick={() => dispatch({ type: "select", id: place.id })}>
+                <td>
+                  <strong>{place.name}</strong>
+                  <span className="fine">
+                    {continentsOf(place).join(" · ")} · {place.kind === "country" ? "Country" : "Spot"}
+                  </span>
+                </td>
+                <td>{TEMP_LABELS[band]}</td>
+                <td>{count.toLocaleString("en-US")}</td>
+                <td>
+                  <Rating value={place.scores.overall} />
+                </td>
+                <td>{guidance.level === "blocked" ? "Not sponsored" : guidance.level === "regional" ? "Partial ban" : "Waiver if sponsored"}</td>
+                <td onClick={(event) => event.stopPropagation()}>
+                  <TravelLinks name={place.name} />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

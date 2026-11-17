@@ -1,6 +1,6 @@
 import * as am5 from "@amcharts/amcharts5";
 import * as am5map from "@amcharts/amcharts5/map";
-import worldLow from "@amcharts/amcharts5-geodata/worldLow";
+import worldHigh from "@amcharts/amcharts5-geodata/worldHigh";
 import { useEffect, useRef } from "react";
 import { COUNTRY_BY_ISO, PLACE_BY_ID, PLACES } from "./data";
 import { heatColor, seasonLabel, visitCount } from "./logic";
@@ -172,7 +172,8 @@ export function MapView() {
         panY: "translateY",
         wheelY: "zoom",
         pinchZoom: true,
-        maxZoomLevel: 160,
+        zoomStep: 1.08,
+        maxZoomLevel: 40,
         minZoomLevel: 1,
         homeGeoPoint: { longitude: -18, latitude: 18 },
         homeZoomLevel: 1,
@@ -184,7 +185,7 @@ export function MapView() {
 
     const polygons = chart.series.push(
       am5map.MapPolygonSeries.new(root, {
-        geoJSON: worldLow,
+        geoJSON: worldHigh,
         exclude: ["AQ"],
       }),
     );
