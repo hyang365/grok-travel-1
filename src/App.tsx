@@ -5,6 +5,7 @@ import { MapView } from "./MapView";
 import { CatalogView, EmptyPanel, FilterRail, FriendsView, ItineraryView, PlacePanel } from "./ui";
 import { StoreProvider, useCatalog, useTripTable } from "./store";
 import { PLACE_BY_ID } from "./data";
+import { AveloToggle, FlightsView } from "./flights/FlightsView";
 
 function Shell() {
   const checked = useRef(false);
@@ -90,6 +91,9 @@ function Shell() {
           <button className={state.view === "catalog" ? "nav-btn active" : "nav-btn"} type="button" onClick={() => dispatch({ type: "setView", view: "catalog" })}>
             Catalog
           </button>
+          <button className={state.view === "flights" ? "nav-btn active" : "nav-btn"} type="button" onClick={() => dispatch({ type: "setView", view: "flights" })}>
+            Flights
+          </button>
           <button
             className={state.view === "friends" ? "nav-btn active" : "nav-btn"}
             type="button"
@@ -105,6 +109,7 @@ function Shell() {
             Itinerary
             <span className="badge">{state.trips.length}</span>
           </button>
+          <AveloToggle />
           <button
             className="nav-btn"
             type="button"
@@ -150,6 +155,7 @@ function Shell() {
           </div>
         </div>
       ) : null}
+      {state.view === "flights" ? <FlightsView /> : null}
       {state.view === "friends" ? <FriendsView /> : null}
       {state.view === "itinerary" ? <ItineraryView /> : null}
       {state.toast ? (
