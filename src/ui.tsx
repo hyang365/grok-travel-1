@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FindFlightsButton } from "./flights/FlightsView";
 import { DIRECTORY, ME, PLACE_BY_ID, PLACES, SUGGESTED_NETIDS } from "./data";
 import {
   anonymousOverlap,
@@ -257,6 +258,7 @@ export function PlacePanel({ place }: { place: Place }) {
           </button>
         </div>
         <p className="blurb">{place.blurb}</p>
+        <FindFlightsButton placeId={place.id} />
         <GuidanceNote iso={place.iso} />
         <p className="fine">{continentsOf(place).join(" and ")}</p>
         <ul className="tags">
