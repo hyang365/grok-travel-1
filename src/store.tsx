@@ -22,6 +22,7 @@ export type State = {
   view: ViewName;
   season: Season;
   sort: SortKey;
+  sortDir: "asc" | "desc";
   filters: Filters;
   selectedId: string | null;
   emptyGeo: { iso: string; name: string } | null;
@@ -46,6 +47,7 @@ function defaultState(): State {
     view: "map",
     season: "spring",
     sort: "yalies",
+    sortDir: "desc",
     filters: { ...DEFAULT_FILTERS },
     selectedId: null,
     emptyGeo: null,
@@ -102,6 +104,7 @@ function loadState(): State {
       view: data.view && VIEWS.has(data.view) ? data.view : base.view,
       season: data.season && SEASONS.has(data.season) ? data.season : base.season,
       sort: data.sort && SORTS.has(data.sort) ? data.sort : base.sort,
+      sortDir: data.sortDir === "asc" ? "asc" : "desc",
       filters,
       selectedId: data.selectedId && PLACE_BY_ID.has(data.selectedId) ? data.selectedId : null,
       showFriends: data.showFriends !== false,
@@ -147,7 +150,8 @@ function reducer(state: State, action: Action): State {
     case "setSeason":
       return { ...state, season: action.season };
     case "setSort":
-      return { ...state, sort: action.sort };
+      if (state.sort === action.sort) return { ...state, sortDir: state.sortDir === "desc" ? "asc" : "desc" };
+      return { ...state, sort: action.sort, sortDir: "desc" };
     case "patchFilters":
       return { ...state, filters: { ...state.filters, ...action.patch } };
     case "select":
@@ -252,9 +256,12 @@ export function useCatalog(): {
     const rows = [...PLACE_BY_ID.values()]
       .map((place) => ({ place, count: visitCount(place, state.season) }))
       .filter((row) => passesFilters(row.place, row.count, state.filters));
+    const direction = state.sortDir === "asc" ? 1 : -1;
     rows.sort((a, b) => {
-      if (state.sort === "yalies") return b.count - a.count || b.place.scores.overall - a.place.scores.overall;
-      return sortScore(b.place.scores, state.sort) - sortScore(a.place.scores, state.sort) || b.count - a.count;
+      const primary =
+        state.sort === "yalies" ? a.count - b.count : sortScore(a.place.scores, state.sort) - sortScore(b.place.scores, state.sort);
+      if (primary !== 0) return primary * direction;
+      return (a.count - b.count) * direction || a.place.name.localeCompare(b.place.name);
     });
     const passed = new Set(rows.map((row) => row.place.id));
     const total =
@@ -266,7 +273,7 @@ export function useCatalog(): {
       ...[...PLACE_BY_ID.values()].filter((place) => place.kind === "country").map((place) => visitCount(place, state.season)),
     );
     return { rows, passed, total, maxCountry };
-  }, [state.filters, state.season, state.sort]);
+  }, [state.filters, state.season, state.sort, state.sortDir]);
 }
 
 export function useFriends(): Person[] {

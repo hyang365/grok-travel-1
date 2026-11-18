@@ -6,6 +6,7 @@ import { CatalogView, EmptyPanel, FilterRail, FriendsView, ItineraryView, PlaceP
 import { StoreProvider, useCatalog, useTripTable } from "./store";
 import { PLACE_BY_ID } from "./data";
 import { AveloToggle, FlightsView } from "./flights/FlightsView";
+import { LOGO } from "./logo";
 
 function Shell() {
   const checked = useRef(false);
@@ -23,6 +24,13 @@ function Shell() {
   useEffect(() => {
     document.title = `TripTable · ${seasonLabel(state.season)}`;
   }, [state.season]);
+
+  useEffect(() => {
+    const link = document.querySelector<HTMLLinkElement>("link[rel='icon']") ?? document.createElement("link");
+    link.rel = "icon";
+    link.href = LOGO;
+    if (!link.parentElement) document.head.appendChild(link);
+  }, []);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -45,9 +53,7 @@ function Shell() {
     <div className="app">
       <header className="topbar">
         <button className="brand" type="button" onClick={() => dispatch({ type: "world" })}>
-          <span className="brand-mark" aria-hidden="true">
-            T
-          </span>
+          <img className="brand-mark" src={LOGO} alt="" />
           <span className="brand-name">triptable</span>
         </button>
         <input

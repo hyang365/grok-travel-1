@@ -95,15 +95,10 @@ ul { margin: 0; padding: 0; list-style: none; }
   padding: 0 4px;
 }
 .brand-mark {
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  display: grid;
-  place-items: center;
-  background: var(--color-primary);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
+  width: 36px;
+  height: 36px;
+  display: block;
+  object-fit: cover;
 }
 .brand-name {
   font-size: 18px;
@@ -337,10 +332,22 @@ input[type="range"]::-moz-range-thumb {
   font-size: 12px;
   color: var(--color-text-tertiary);
   font-weight: 650;
-  padding: 10px 12px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--color-border);
+  z-index: 1;
 }
-.catalog-table td { padding: 10px 12px; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+.sort-head {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  padding: 0;
+  cursor: pointer;
+}
+.sort-head.active { color: var(--color-text); }
+.catalog-table td { padding: 10px 12px; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+.catalog-table td.num { padding: 0; width: 88px; }
 .catalog-table td strong { display: block; }
 .catalog-table tbody tr { cursor: pointer; }
 .catalog-table tbody tr:hover { background: var(--color-surface-hover); }
@@ -397,13 +404,19 @@ input[type="range"]::-moz-range-thumb {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 36px;
-  height: 22px;
+  min-width: 40px;
+  height: 26px;
   padding: 0 6px;
-  border-radius: 5px;
+  border-radius: 0;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   font-size: 12px;
+}
+.catalog-table td.num .rate {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  box-sizing: border-box;
 }
 .rate.great { background: #d9f5e3; color: #0b7a32; }
 .rate.good { background: #e5f6ea; color: #1b7a38; }

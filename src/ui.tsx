@@ -19,7 +19,7 @@ import {
   SEASONS,
 } from "./logic";
 import { DEFAULT_FILTERS, useCatalog, useFriends, useTripTable } from "./store";
-import type { Place, Season } from "./types";
+import type { Place, Season, SortKey } from "./types";
 
 export function Rating({ value }: { value: number }) {
   return <span className={`rate ${ratingBand(value)}`}>{value.toFixed(1)}</span>;
@@ -581,6 +581,19 @@ function yalieBand(count: number): "great" | "good" | "ok" | "low" {
   return "low";
 }
 
+function SortHeader({ label, sort }: { label: string; sort: SortKey }) {
+  const { state, dispatch } = useTripTable();
+  const active = state.sort === sort;
+  return (
+    <th aria-sort={active ? (state.sortDir === "desc" ? "descending" : "ascending") : "none"}>
+      <button className={active ? "sort-head active" : "sort-head"} type="button" onClick={() => dispatch({ type: "setSort", sort })}>
+        {label}
+        {active ? (state.sortDir === "desc" ? " ↓" : " ↑") : ""}
+      </button>
+    </th>
+  );
+}
+
 export function CatalogView() {
   const { state, dispatch } = useTripTable();
   const { rows } = useCatalog();
@@ -592,11 +605,11 @@ export function CatalogView() {
         <thead>
           <tr>
             <th>Place</th>
-            <th>Yalies</th>
-            <th>Overall</th>
-            <th>Afford</th>
-            <th>Safety</th>
-            <th>Beauty</th>
+            <SortHeader label="Yalies" sort="yalies" />
+            <SortHeader label="Overall" sort="overall" />
+            <SortHeader label="Afford" sort="affordability" />
+            <SortHeader label="Safety" sort="safety" />
+            <SortHeader label="Beauty" sort="beauty" />
             <th>Yale rules</th>
             <th aria-label="Add" />
           </tr>
@@ -612,19 +625,19 @@ export function CatalogView() {
                     {continentsOf(place).join(" · ")} · {place.kind === "country" ? "Country" : "Spot"}
                   </span>
                 </td>
-                <td>
+                <td className="num">
                   <span className={`rate ${yalieBand(count)}`}>{count.toLocaleString("en-US")}</span>
                 </td>
-                <td>
+                <td className="num">
                   <Rating value={place.scores.overall} />
                 </td>
-                <td>
+                <td className="num">
                   <Rating value={place.scores.affordability} />
                 </td>
-                <td>
+                <td className="num">
                   <Rating value={place.scores.safety} />
                 </td>
-                <td>
+                <td className="num">
                   <Rating value={place.scores.beauty} />
                 </td>
                 <td>{guidance.level === "blocked" ? "Not sponsored" : guidance.level === "regional" ? "Partial ban" : "Waiver if sponsored"}</td>
