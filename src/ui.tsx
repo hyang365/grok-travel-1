@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FindFlightsButton } from "./flights/FlightsView";
 import { DIRECTORY, ME, PLACE_BY_ID, PLACES, SUGGESTED_NETIDS } from "./data";
 import {
   anonymousOverlap,
@@ -272,6 +273,7 @@ export function PlacePanel({ place }: { place: Place }) {
         </div>
         <p className="blurb">{place.blurb}</p>
         <TravelLinks name={place.name} />
+        <FindFlightsButton placeId={place.id} />
         <GuidanceNote iso={place.iso} />
         <p className="fine">
           {TEMP_LABELS[tempBand(averageTempC(place.lat, state.season))]} in {seasonLabel(state.season).toLowerCase()} · {continentsOf(place).join(" and ")}
