@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FindFlightsButton, GroupFlightSummary } from "./flights/FlightsView";
 import { PLACE_BY_ID, PLACES } from "./data";
 import { account, displayName, useAccount, useMe } from "./account/account";
@@ -175,6 +175,7 @@ export function FilterRail({ open, onPick }: { open: boolean; onPick: () => void
               key={feature.id}
               type="button"
               className={filters.features.includes(feature.id) ? "on" : ""}
+              aria-pressed={filters.features.includes(feature.id)}
               onClick={() => dispatch({ type: "patchFilters", patch: { features: toggleValue(filters.features, feature.id) } })}
             >
               {feature.label}
@@ -188,6 +189,7 @@ export function FilterRail({ open, onPick }: { open: boolean; onPick: () => void
               key={name}
               type="button"
               className={filters.continents.includes(name) ? "on" : ""}
+              aria-pressed={filters.continents.includes(name)}
               onClick={() => dispatch({ type: "patchFilters", patch: { continents: toggleValue(filters.continents, name) } })}
             >
               {name}
@@ -209,8 +211,16 @@ export function FilterRail({ open, onPick }: { open: boolean; onPick: () => void
         <p className="fine">Rating sliders hide places rated below the value. Ratings come only from student reviews.</p>
       </div>
       </details>
+      {rows.length === 0 ? (
+        <div className="empty-card" role="status">
+          <h2>No places match</h2>
+          <p>These filters hide every place.</p>
+          <button className="primary" type="button" onClick={() => dispatch({ type: "patchFilters", patch: { ...DEFAULT_FILTERS, query: filters.query } })}>
+            Reset filters
+          </button>
+        </div>
+      ) : (
       <div className="list" role="listbox" aria-label="Places">
-        {rows.length === 0 ? <p className="empty">Nothing clears these filters.</p> : null}
         {rows.map(({ place, count }) => {
           const parent = place.parentId ? PLACE_BY_ID.get(place.parentId) : undefined;
           return (
@@ -239,6 +249,7 @@ export function FilterRail({ open, onPick }: { open: boolean; onPick: () => void
           );
         })}
       </div>
+      )}
     </aside>
   );
 }
@@ -530,9 +541,7 @@ function PlanForm({ place, onDone }: { place: Place; onDone?: () => void }) {
               }
             />
             {person.name}
-            <span className="fine">
-              {person.college} '{person.year.slice(2)}
-            </span>
+            <span className="fine">{classLabel(person)}</span>
           </label>
         ))}
       </fieldset>
@@ -580,7 +589,8 @@ export function EmptyPanel({ geo }: { geo: { iso: string; name: string } }) {
   );
 }
 
-function yalieBand(count: number): "great" | "good" | "ok" | "low" {
+function yalieBand(count: number): "great" | "good" | "ok" | "low" | "none" {
+  if (count <= 0) return "none";
   if (count >= 100) return "great";
   if (count >= 40) return "good";
   if (count >= 15) return "ok";
@@ -600,13 +610,54 @@ function SortHeader({ label, sort }: { label: string; sort: SortKey }) {
   );
 }
 
+function classLabel(person: { college: string; year: string }): string {
+  if (!person.year) return person.college;
+  const short = person.year.length > 2 ? person.year.slice(-2) : person.year;
+  return `${person.college} '${short}`;
+}
+
 export function CatalogView() {
   const { state, dispatch } = useTripTable();
   const { rows } = useCatalog();
   const [adding, setAdding] = useState<Place | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!adding) return;
+    const node = dialogRef.current;
+    node?.querySelector<HTMLButtonElement>("[data-dialog-close]")?.focus();
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setAdding(null);
+        return;
+      }
+      if (event.key !== "Tab" || !node) return;
+      const items = [...node.querySelectorAll<HTMLElement>("button, input, select, textarea, a[href]")].filter((el) => !el.hasAttribute("disabled"));
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [adding]);
   return (
     <div className="catalog">
-      {rows.length === 0 ? <p className="empty">Nothing clears these filters.</p> : null}
+      {rows.length === 0 ? (
+        <div className="empty-card" role="status">
+          <h2>No places match</h2>
+          <p>These filters hide every place. Reset them to see the full list.</p>
+          <button className="primary" type="button" onClick={() => dispatch({ type: "patchFilters", patch: { ...DEFAULT_FILTERS, query: "" } })}>
+            Reset filters
+          </button>
+        </div>
+      ) : (
       <table className="catalog-table">
         <thead>
           <tr>
@@ -626,10 +677,12 @@ export function CatalogView() {
             return (
               <tr key={place.id} className={state.selectedId === place.id ? "active" : ""} onClick={() => dispatch({ type: "select", id: place.id })}>
                 <td>
-                  <strong>{place.name}</strong>
-                  <span className="fine">
-                    {continentsOf(place).join(" · ")} · {place.kind === "country" ? "Country" : "Spot"}
-                  </span>
+                  <button type="button" className="place-open" onClick={() => dispatch({ type: "select", id: place.id })}>
+                    <strong>{place.name}</strong>
+                    <span className="fine">
+                      {continentsOf(place).join(" · ")} · {place.kind === "country" ? "Country" : "Spot"}
+                    </span>
+                  </button>
                 </td>
                 <td className="num">
                   <span className={`rate ${yalieBand(count)}`}>{count.toLocaleString("en-US")}</span>
@@ -665,12 +718,13 @@ export function CatalogView() {
           })}
         </tbody>
       </table>
+      )}
       {adding ? (
         <div className="modal-back" onClick={() => setAdding(null)}>
-          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="add-title" onClick={(event) => event.stopPropagation()}>
+          <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="add-title" onClick={(event) => event.stopPropagation()}>
             <div className="panel-head">
               <h2 id="add-title">Add {adding.name}</h2>
-              <button className="icon-btn" type="button" aria-label="Close" onClick={() => setAdding(null)}>
+              <button className="icon-btn" type="button" data-dialog-close aria-label="Close" onClick={() => setAdding(null)}>
                 ×
               </button>
             </div>
