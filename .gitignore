@@ -5,3 +5,4 @@ site
 *.local
 .vite
 public/transit-static.json
+.superdesign/tmp/

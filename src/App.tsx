@@ -232,6 +232,7 @@ function Shell() {
                 World
               </button>
             </div>
+            <p className="map-credit">Imagery: NASA Earth Observatory</p>
             {abroadMap ? (
               state.abroadIso ? <AbroadMapPanel iso={state.abroadIso} /> : null
             ) : (

@@ -62,15 +62,15 @@
 .map-mode {
   position: absolute;
   z-index: 3;
-  top: 12px;
+  top: 16px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 99px;
-  padding: 3px;
-  box-shadow: var(--shadow);
+  padding: 4px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 12%), 0 12px 32px rgb(0 0 0 / 20%);
 }
 .map-mode button { border: 0; background: transparent; border-radius: 99px; height: 30px; padding: 0 14px; font-weight: 600; color: var(--color-text-secondary); }
 .map-mode button.active { background: var(--color-primary); color: var(--color-on-primary); }

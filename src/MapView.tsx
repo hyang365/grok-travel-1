@@ -1,6 +1,8 @@
 import * as am5 from "@amcharts/amcharts5";
 import * as am5map from "@amcharts/amcharts5/map";
 import worldHigh from "@amcharts/amcharts5-geodata/worldHigh";
+import earthDay from "@amcharts/amcharts5-geodata/images/earthDay2048.jpg";
+import earthNight from "@amcharts/amcharts5-geodata/images/earthNight2048.jpg";
 import { useEffect, useRef } from "react";
 import { COUNTRY_BY_ISO, PLACE_BY_ID, PLACES } from "./data";
 import { heatColor, seasonLabel, visitCount } from "./logic";
@@ -21,13 +23,39 @@ type PointDatum = {
 type Api = {
   root: am5.Root;
   chart: am5map.MapChart;
+  raster: am5map.MapRasterSeries;
   polygons: am5map.MapPolygonSeries;
   spots: am5map.MapPointSeries;
   pals: am5map.MapPointSeries;
   background: am5.Rectangle;
+  zoom: am5map.ZoomControl;
   ready: boolean;
   seen: Set<string>;
+  earth: string;
 };
+
+function styleZoom(zoom: am5map.ZoomControl, dark: boolean) {
+  const fill = am5.color(dark ? 0x1a1c21 : 0xffffff);
+  const stroke = am5.color(dark ? 0x32343b : 0xe4e6ea);
+  const ink = am5.color(dark ? 0xfafafa : 0x141414);
+  for (const button of [zoom.plusButton, zoom.minusButton]) {
+    button.get("background")?.setAll({ fill, fillOpacity: 1, stroke, strokeOpacity: 1 });
+    button.get("icon")?.setAll({ fill: ink, stroke: ink });
+  }
+}
+
+function paintCountry(polygon: am5map.MapPolygon, heat: number | null, selected: boolean, dark: boolean) {
+  if (heat !== null) {
+    polygon.set("fill", am5.color(heat));
+    polygon.set("fillOpacity", selected ? 0.8 : 0.58);
+  } else {
+    polygon.set("fill", am5.color(dark ? 0x071018 : 0x08243f));
+    polygon.set("fillOpacity", selected ? 0.28 : 0);
+  }
+  polygon.set("stroke", am5.color(selected ? 0xffffff : dark ? 0xd7e4f4 : 0xffffff));
+  polygon.set("strokeOpacity", selected ? 1 : heat !== null ? 0.9 : 0.42);
+  polygon.set("strokeWidth", selected ? 2.2 : heat !== null ? 0.9 : 0.45);
+}
 
 function polygonItem(series: am5map.MapPolygonSeries, iso: string) {
   let found: am5.DataItem<am5map.IMapPolygonSeriesDataItem> | undefined;
@@ -65,7 +93,13 @@ export function MapView() {
     if (!api?.ready) return;
     const dark = state.theme === "dark";
     const seasonName = seasonLabel(state.season);
-    api.background.set("fill", am5.color(dark ? 0x121820 : 0xe8f1fb));
+    const earth = dark ? earthNight : earthDay;
+    api.background.set("fill", am5.color(dark ? 0x071018 : 0x163a5f));
+    if (api.earth !== earth) {
+      api.earth = earth;
+      api.raster.set("src", earth);
+      styleZoom(api.zoom, dark);
+    }
     if (abroad) {
       const term = state.abroadTerm;
       const maxN = maxPerCountry(term);
@@ -74,9 +108,7 @@ export function MapView() {
         const ctx = polygon.dataItem?.dataContext as { id?: string; name?: string } | undefined;
         const n = ctx?.id ? programsIn(ctx.id, term).length : 0;
         const isSelected = Boolean(ctx?.id && ctx.id === state.abroadIso);
-        polygon.set("fill", am5.color(n ? heatColor(n, maxN, dark) : dark ? 0x2a2a2a : 0xf3f3f3));
-        polygon.set("stroke", am5.color(isSelected ? (dark ? 0xffffff : 0x141414) : dark ? 0x1a1a1a : 0xffffff));
-        polygon.set("strokeWidth", isSelected ? 1.8 : 0.55);
+        paintCountry(polygon, n ? heatColor(n, maxN, dark) : null, isSelected, dark);
         polygon.set("tooltipText", n ? `${ctx?.name ?? ""}\n${n} ${termLabel} ${n === 1 ? "program" : "programs"}` : (ctx?.name ?? ""));
       });
       const spots: PointDatum[] = [];
@@ -92,7 +124,7 @@ export function MapView() {
           iso: city.iso,
           tooltip: `${city.city}\n${names.join("\n")}`,
           radius: (city.iso === state.abroadIso ? 7 : 4) + Math.min(5, progs.length),
-          fill: 0x0b3d91,
+          fill: 0x0c4a8a,
         });
       }
       api.spots.data.setAll(spots);
@@ -105,9 +137,8 @@ export function MapView() {
       const count = country ? visitCount(country, state.season) : 0;
       const on = Boolean(country && passed.has(country.id));
       const isSelected = country?.id === state.selectedId;
-      polygon.set("fill", am5.color(on && country && count > 0 ? heatColor(count, maxCountry, dark) : dark ? 0x2a2a2a : 0xf3f3f3));
-      polygon.set("stroke", am5.color(isSelected ? (dark ? 0xffffff : 0x141414) : dark ? 0x1a1a1a : 0xffffff));
-      polygon.set("strokeWidth", isSelected ? 1.8 : 0.55);
+      const heat = on && country && count > 0 ? heatColor(count, maxCountry, dark) : null;
+      paintCountry(polygon, heat, isSelected, dark);
       polygon.set(
         "tooltipText",
         on && country ? `${country.name}\n${count ? `${count.toLocaleString("en-US")} planning` : "No plans yet"} · ${seasonName}` : (ctx?.name ?? ""),
@@ -130,8 +161,8 @@ export function MapView() {
         longitude: place.lng,
         placeId: place.id,
         tooltip: `${place.name}\n${count ? `${count.toLocaleString("en-US")} planning` : "No plans yet"}`,
-        radius: (place.id === state.selectedId ? 8 : 4) + scale * 7,
-        fill: place.id === state.selectedId ? 0x0b3d91 : 0x163e78,
+        radius: (place.id === state.selectedId ? 8 : 4) + scale * 6,
+        fill: place.id === state.selectedId ? 0x08366a : 0x0c4a8a,
       });
     }
     for (const place of PLACES) {
@@ -143,7 +174,7 @@ export function MapView() {
         placeId: place.id,
         tooltip: `${place.name}\n${count ? `${count.toLocaleString("en-US")} planning` : "No plans yet"} · ${seasonName}`,
         radius: place.id === state.selectedId ? 12 : 8,
-        fill: 0x0b3d91,
+        fill: 0x0c4a8a,
       });
     }
     const friendDots: PointDatum[] = [];
@@ -175,7 +206,9 @@ export function MapView() {
     const api = apiRef.current;
     if (!api?.ready) return;
     const token = (zoomToken.current += 1);
-    api.chart.set("paddingRight", panelOpen ? 430 : 20);
+    const wide = window.innerWidth > 960;
+    api.chart.set("paddingRight", panelOpen && wide ? 440 : 0);
+    api.chart.set("paddingBottom", panelOpen && !wide ? Math.round(window.innerHeight * 0.46) : 0);
     // Padding changes the plot size on the next frame. Zoom after that so a
     // small country lands in the map beside the panel, not underneath it.
     requestAnimationFrame(() => {
@@ -224,12 +257,15 @@ export function MapView() {
         maxZoomLevel: 40,
         minZoomLevel: 1,
         homeGeoPoint: { longitude: -18, latitude: 18 },
-        homeZoomLevel: 1,
+        homeZoomLevel: 1.15,
       }),
     );
-    const background = am5.Rectangle.new(root, { fill: am5.color(0xe8f1fb), fillOpacity: 1 });
+    const background = am5.Rectangle.new(root, { fill: am5.color(0x163a5f), fillOpacity: 1 });
     chart.set("background", background);
-    chart.set("zoomControl", am5map.ZoomControl.new(root, { x: 12, centerX: 0, y: 12, centerY: 0 }));
+    const zoom = am5map.ZoomControl.new(root, { x: 16, centerX: 0, y: 16, centerY: 0 });
+    chart.set("zoomControl", zoom);
+    styleZoom(zoom, false);
+    const raster = chart.series.push(am5map.MapRasterSeries.new(root, { src: earthDay, affectsBounds: false }));
 
     const polygons = chart.series.push(
       am5map.MapPolygonSeries.new(root, {
@@ -240,12 +276,14 @@ export function MapView() {
     polygons.mapPolygons.template.setAll({
       interactive: true,
       cursorOverStyle: "pointer",
-      fill: am5.color(0xf3f3f3),
+      fill: am5.color(0x08243f),
+      fillOpacity: 0,
       stroke: am5.color(0xffffff),
-      strokeWidth: 0.55,
+      strokeOpacity: 0.42,
+      strokeWidth: 0.45,
       tooltipText: "{name}",
     });
-    polygons.mapPolygons.template.states.create("hover", { fillOpacity: 0.86 });
+    polygons.mapPolygons.template.states.create("hover", { strokeOpacity: 1, strokeWidth: 1.3 });
     polygons.mapPolygons.template.events.on("click", (event) => {
       if (Date.now() - pointGuard.current < 50) return;
       const ctx = event.target.dataItem?.dataContext as { id?: string; name?: string } | undefined;
@@ -265,9 +303,9 @@ export function MapView() {
       series.bullets.push((bulletRoot) => {
         const circle = am5.Circle.new(bulletRoot, {
           radius: 5,
-          fill: am5.color(0x163e78),
+          fill: am5.color(0x0c4a8a),
           stroke: am5.color(0xffffff),
-          strokeWidth: 1.5,
+          strokeWidth: 2,
           cursorOverStyle: "pointer",
           tooltipText: "{tooltip}",
         });
@@ -277,7 +315,7 @@ export function MapView() {
         });
         circle.adapters.add("fill", (_fill, target) => {
           const ctx = target.dataItem?.dataContext as PointDatum | undefined;
-          return am5.color(ctx?.fill ?? 0x163e78);
+          return am5.color(ctx?.fill ?? 0x0c4a8a);
         });
         circle.events.on("click", (event) => {
           pointGuard.current = Date.now();
@@ -291,7 +329,7 @@ export function MapView() {
     attach(spots);
     attach(pals);
 
-    const api: Api = { root, chart, polygons, spots, pals, background, ready: false, seen: new Set() };
+    const api: Api = { root, chart, raster, polygons, spots, pals, background, zoom, ready: false, seen: new Set(), earth: earthDay };
     apiRef.current = api;
     polygons.events.on("datavalidated", () => {
       const seen = new Set<string>();
@@ -302,6 +340,7 @@ export function MapView() {
       api.seen = seen;
       api.ready = true;
       paintRef.current();
+      chart.goHome(0);
       zoomRef.current();
     });
 
