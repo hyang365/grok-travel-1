@@ -101,6 +101,7 @@ function Shell() {
   return (
     <div className="app">
       <header className="topbar">
+        <h1 className="sr">TripTable</h1>
         <button className="brand" type="button" onClick={() => dispatch({ type: "world" })}>
           <img className="brand-mark" src={LOGO} alt="" />
           <span className="brand-name">triptable</span>
@@ -164,7 +165,7 @@ function Shell() {
           {NAV.map(([view, label]) => {
             const active = view === "itinerary" ? tripsView : state.view === view;
             return (
-              <button key={view} className={active ? "nav-btn active" : "nav-btn"} type="button" onClick={() => dispatch({ type: "setView", view })}>
+              <button key={view} className={active ? "nav-btn active" : "nav-btn"} type="button" aria-current={active ? "page" : undefined} onClick={() => dispatch({ type: "setView", view })}>
                 {view === "abroad" ? (
                   <>
                     <span className="nav-long">Study Abroad</span>

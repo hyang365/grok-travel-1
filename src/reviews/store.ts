@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { SHARED, SUPABASE_ANON_KEY, SUPABASE_URL, supabase, YALE_EMAIL } from "./backend";
+import { SHARED, SUPABASE_ANON_KEY, SUPABASE_URL, supabase, YALE_EMAIL, yaleEmailOf } from "./backend";
 
 export type TargetType = "place" | "program";
 
@@ -123,6 +123,29 @@ async function refresh() {
   else emit({ loading: false, error: null, reviews: (data as Row[]).map(fromRow) });
 }
 
+let droppingNonYale = false;
+
+/** A session counts only when it is a @yale.edu account. Anything else is signed out. */
+function applyUser(user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> | null; identities?: { identity_data?: Record<string, unknown> | null }[] | null } | null | undefined) {
+  if (useLocal || !supabase) return;
+  if (!user) {
+    emit({ session: null });
+    return;
+  }
+  const email = yaleEmailOf(user);
+  if (!email) {
+    emit({ session: null, authError: "Use your @yale.edu Google account to sign in." });
+    if (!droppingNonYale) {
+      droppingNonYale = true;
+      void supabase.auth.signOut().finally(() => {
+        droppingNonYale = false;
+      });
+    }
+    return;
+  }
+  emit({ session: { userId: user.id, email }, authError: null });
+}
+
 function init() {
   // Old local-only program reviews from the first version of the Study Abroad tab.
   localStorage.removeItem("triptable-abroad-reviews-v1");
@@ -130,16 +153,8 @@ function init() {
     snap = { ...snap, reviews: readLocal(), session: { userId: LOCAL_USER, email: "" }, loading: false };
     return;
   }
-  supabase.auth.getSession().then(({ data }) => {
-    if (useLocal) return;
-    const user = data.session?.user;
-    emit({ session: user ? { userId: user.id, email: user.email ?? "" } : null });
-  });
-  supabase.auth.onAuthStateChange((_event, session) => {
-    if (useLocal) return;
-    const user = session?.user;
-    emit({ session: user ? { userId: user.id, email: user.email ?? "" } : null });
-  });
+  supabase.auth.getSession().then(({ data }) => applyUser(data.session?.user));
+  supabase.auth.onAuthStateChange((_event, session) => applyUser(session?.user));
   void refresh();
   // Supabase publishes which sign-in providers are enabled; only offer Google once it's on.
   fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_ANON_KEY } })
@@ -156,6 +171,7 @@ export type Draft = Omit<Review, "id" | "userId" | "createdAt">;
 
 export const reviews = {
   clearAuthError: () => emit({ authError: null }),
+  setAuthError: (authError: string) => emit({ authError }),
   subscribe(fn: () => void) {
     listeners.add(fn);
     return () => {
@@ -180,7 +196,11 @@ export const reviews = {
     if (!supabase || useLocal) return "Sign-in isn't connected yet.";
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: location.origin + location.pathname, queryParams: { hd: "yale.edu", prompt: "select_account" } },
+      options: {
+        redirectTo: location.origin + location.pathname,
+        scopes: "openid email profile",
+        queryParams: { hd: "yale.edu", prompt: "select_account" },
+      },
     });
     return error ? error.message : null;
   },

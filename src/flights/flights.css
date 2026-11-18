@@ -33,7 +33,7 @@
 .fl-breaks { display: flex; flex-wrap: wrap; gap: 6px; }
 .fl-breaks button, .fl-chip { height: 30px; padding: 0 10px; border-radius: 99px; border: 1px solid var(--color-border-control); background: var(--color-surface); font-size: 12px; }
 .fl-breaks button:hover, .fl-chip:hover { background: var(--color-surface-hover); }
-.fl-breaks button.on, .fl-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.fl-breaks button.on, .fl-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
 
 /* Toolbar + filters */
 .fl-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }

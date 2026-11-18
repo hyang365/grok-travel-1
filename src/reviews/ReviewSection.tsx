@@ -126,7 +126,13 @@ export function ReviewSection({
       ) : (
         <SignInBox />
       )}
-      {loading ? <p className="fine">Loading reviews…</p> : null}
+      {loading && list.length === 0 ? (
+        <div className="rv-skeleton" aria-busy="true" aria-label="Loading reviews">
+          <div />
+          <div />
+          <div />
+        </div>
+      ) : null}
       <ul className="rv-list">
         {list.map((r) => (
           <li key={r.id}>

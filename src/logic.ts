@@ -41,10 +41,17 @@ export function defaultWindow(season: Season): [string, string] {
   if (season === "fall") return [`${y}-10-15`, `${y}-10-19`];
   if (season === "winter") return [`${y}-12-20`, `${y + 1}-01-03`];
   const d = new Date();
-  d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7 || 7));
-  const fri = d.toISOString().slice(0, 10);
+  // Friday is day 5. A Friday uses this weekend; later days roll to the next Friday. Local dates, not UTC.
+  d.setDate(d.getDate() + ((5 - d.getDay() + 7) % 7));
+  const fri = localISODate(d);
   d.setDate(d.getDate() + 2);
-  return [fri, d.toISOString().slice(0, 10)];
+  return [fri, localISODate(d)];
+}
+
+function localISODate(d: Date): string {
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${month}-${day}`;
 }
 
 export function parseISODate(iso: string): number {

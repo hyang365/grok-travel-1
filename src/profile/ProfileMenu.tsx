@@ -6,7 +6,7 @@ import type { ProfileTab } from "../types";
 import { isPast } from "./trips";
 import "./profile.css";
 
-const REPO = "https://github.com/hyang365/grok1";
+const REPO = "https://github.com/hyang365/grok-travel-1";
 
 export function issueUrl(kind: "bug" | "feature" | "data", view: string): string {
   const titles = { bug: "Bug: ", feature: "Idea: ", data: "Missing or wrong info: " };
