@@ -84,6 +84,13 @@ const arr = (o: Obj, ...keys: string[]): unknown[] => {
   return [];
 };
 const str = (v: unknown) => (v === undefined || v === null ? "" : String(v));
+function delayMinutes(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.round(n / 60);
+}
+
 function epochMs(v: unknown): number | null {
   if (v === undefined || v === null || v === "") return null;
   if (typeof v === "number") return v > 1e12 ? v : v * 1000;
@@ -168,7 +175,7 @@ async function loadBuses(st: Static, stopIds: Set<string>, stopNames: Map<string
         const ev = obj(u.arrival ?? u.departure);
         const at = epochMs(ev.time);
         if (!at || at < now - 60_000 || at > now + 90 * 60_000) continue;
-        const delay = ev.delay === undefined ? null : Math.round(Number(ev.delay) / 60);
+        const delay = delayMinutes(ev.delay);
         arrivals.push({ key: `${tripId}-${stopId}`, route, color, headsign: st.ct?.trips[tripId]?.[1] || "", stopId, stopName: stopNames.get(stopId) ?? stopId, at, delayMin: delay });
       }
     }
@@ -218,7 +225,7 @@ async function loadMetroNorth(st: Static) {
       const ev = obj(here.departure ?? here.arrival);
       const at = epochMs(ev.time);
       if (!at || at < now - 60_000 || at > now + 6 * 3600_000) continue;
-      const delay = ev.delay === undefined ? null : Math.round(Number(ev.delay) / 60);
+      const delay = delayMinutes(ev.delay);
       const sched = st.mnr?.trips[tripId];
       departures.push({
         key: `mnr-${tripId}`,
@@ -229,7 +236,7 @@ async function loadMetroNorth(st: Static) {
         at,
         scheduled: delay !== null ? at - delay * 60_000 : null,
         delayMin: delay,
-        status: delay && delay > 1 ? `${delay} min late` : "On time",
+        status: delay !== null && delay > 1 ? `${delay} min late` : "On time",
       });
     }
     departures.sort((a, b) => a.at - b.at);
