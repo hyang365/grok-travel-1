@@ -130,3 +130,26 @@
   .topbar .nav::-webkit-scrollbar { display: none; }
   .topbar .nav > * { flex: none; }
 }
+
+/* Link-out planner */
+.fl-allairports { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--color-primary); border-radius: 12px; background: var(--color-primary-subdued-2); flex-wrap: wrap; }
+.fl-opt-side .fl-book, .fl-allairports .fl-book, .fl-card .fl-book { justify-content: center; white-space: nowrap; }
+.fl-meta a { color: var(--color-primary); text-decoration: none; }
+.fl-ground { display: flex; flex-direction: column; }
+.fl-ground li { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--color-border); font-size: 13px; }
+.fl-actions a.textlink { text-decoration: none; font-size: 12px; }
+.fl-chip:disabled { opacity: 0.45; text-decoration: line-through; cursor: default; }
+.fl-group { border-color: var(--color-primary); }
+.fl-legcard { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 8px; background: var(--color-surface-contrast); }
+.fl-legcard > div:first-child { display: flex; flex-direction: column; }
+.fl-legform { display: flex; flex-direction: column; gap: 6px; }
+.fl-legrow { display: flex; gap: 6px; }
+.fl-legrow label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--color-text-secondary); flex: 1; min-width: 0; }
+.fl-legrow input, .fl-group .fl-field input { height: 32px; border: 1px solid var(--color-border-control); border-radius: 8px; background: var(--color-surface); padding: 0 8px; width: 100%; min-width: 0; }
+.fl-booked { display: flex; flex-direction: column; gap: 4px; }
+.fl-ok { color: #0b7a32; font-weight: 600; font-size: 13px; }
+.fl-tips { display: flex; flex-direction: column; gap: 6px; padding-left: 16px; list-style: disc; font-size: 13px; color: var(--color-text-secondary); }
+.fl-gsum { font-size: 13px; padding: 6px 10px; border-radius: 8px; background: #fff3d6; color: #8d5b00; }
+.fl-gsum.ok { background: #d9f5e3; color: #0b7a32; }
+:root[data-theme="dark"] .fl-gsum { background: #3a2a0a; color: #ffd27a; }
+:root[data-theme="dark"] .fl-gsum.ok { background: #12301d; color: #7ddc9c; }

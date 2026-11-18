@@ -77,6 +77,24 @@ export type Filters = {
   scope: Scope;
 };
 
+export type FlightLeg = {
+  flight: string; // e.g. "B6 1503"
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM local departure
+  from: string; // airport code
+  to: string;
+};
+
+/** The exact flights a group agreed on, kept on the shared trip so everyone books the same ones. */
+export type GroupFlight = {
+  outbound: FlightLeg;
+  ret: FlightLeg | null;
+  link: string; // Google Flights share link, if someone pasted one
+  setBy: string; // netid
+  booked: string[]; // netids who've confirmed they booked
+  setAt: string;
+};
+
 export type Trip = {
   id: string;
   placeId: string;
@@ -85,4 +103,5 @@ export type Trip = {
   end: string;
   note: string;
   friendNetids: string[];
+  groupFlight?: GroupFlight;
 };

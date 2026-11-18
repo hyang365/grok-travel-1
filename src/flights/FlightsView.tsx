@@ -1,27 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { DIRECTORY, PLACE_BY_ID, PLACES } from "../data";
+import { useMemo, useState } from "react";
+import { DIRECTORY, ME, PLACE_BY_ID, PLACES } from "../data";
 import { formatMoney, formatRange, travelGuidance } from "../logic";
 import { useFriends, useTripTable } from "../store";
-import type { Place, Trip } from "../types";
+import type { FlightLeg, GroupFlight, Place, Trip } from "../types";
 import {
-  AIRLINES,
   BREAKS,
   GATEWAYS,
+  GROUND_LINKS,
   addDays,
-  advice,
-  airportComparison,
-  aveloCount,
-  calendar,
   clock,
   daysBetween,
+  directions,
   duration,
-  rank,
+  flightStatus,
+  googleExactFlight,
+  googleFlights,
+  normalizeFlight,
   resolveDestination,
-  search,
   todayISO,
-  type Option,
-  type Prefs,
-  type SortMode,
+  type Destination,
+  type Gateway,
 } from "./engine";
 import { ALL_GATEWAYS, flightStore, useFlights } from "./flightStore";
 import "./flights.css";
@@ -30,18 +28,18 @@ const SEARCHABLE = PLACES.filter((p) => p.id !== "us");
 
 // ---------- small exported pieces used elsewhere in the app ----------
 
-/** Top-bar switch. Hides every Avelo flight across the flight finder. */
+/** Top-bar switch. Hides Tweed (served almost entirely by Avelo) and reminds you to skip Avelo on Google Flights. */
 export function AveloToggle() {
   const fs = useFlights();
   const { dispatch } = useTripTable();
   return (
-    <label className={fs.boycottAvelo ? "fl-avelo on" : "fl-avelo"} title="Hide every Avelo flight (Tweed's main airline)">
+    <label className={fs.boycottAvelo ? "fl-avelo on" : "fl-avelo"} title="Skip Avelo, Tweed's main airline">
       <input
         type="checkbox"
         checked={fs.boycottAvelo}
         onChange={(e) => {
           flightStore.set({ boycottAvelo: e.target.checked });
-          dispatch({ type: "toast", message: e.target.checked ? "Avelo boycott on. Avelo flights hidden." : "Avelo flights visible again" });
+          dispatch({ type: "toast", message: e.target.checked ? "Avelo boycott on. Tweed hidden from your airports." : "Tweed is back in your airports" });
         }}
       />
       <span className="fl-switch" aria-hidden="true" />
@@ -62,12 +60,26 @@ export function FindFlightsButton({ placeId }: { placeId: string }) {
         dispatch({ type: "setView", view: "flights" });
       }}
     >
-      ✈ Find flights from Yale
+      ✈ Plan getting there from Yale
     </button>
   );
 }
 
-// ---------- date helpers ----------
+/** One-line group flight status for itinerary cards. */
+export function GroupFlightSummary({ trip }: { trip: Trip }) {
+  const g = trip.groupFlight;
+  if (!g) return null;
+  const people = travelersOf(trip);
+  const done = people.filter((id) => g.booked.includes(id)).length;
+  return (
+    <p className={done === people.length ? "fl-gsum ok" : "fl-gsum"}>
+      ✈ Group flight {g.outbound.flight} {g.outbound.from}→{g.outbound.to}
+      {g.ret ? ` · back ${g.ret.flight}` : ""} · {done}/{people.length} booked
+    </p>
+  );
+}
+
+// ---------- helpers ----------
 function rollForward(start: string, end: string): [string, string] {
   let s = start;
   let e = end;
@@ -88,22 +100,49 @@ function defaultDates(place: Place, trips: Trip[], season: string): [string, str
   return spring ? [spring.start, addDays(spring.start, 7)] : [addDays(todayISO(), 30), addDays(todayISO(), 37)];
 }
 
-const shortDate = (iso: string) => formatRange(iso, iso).replace(/–\d+$/, "");
+function travelersOf(trip: Trip): string[] {
+  return [ME.netid, ...trip.friendNetids.filter((id) => id !== ME.netid)];
+}
+
+function nameOf(netid: string): string {
+  if (netid === ME.netid) return "You";
+  return DIRECTORY.find((p) => p.netid === netid)?.name ?? netid;
+}
+
+function timeLabel(hhmm: string): string {
+  const m = hhmm.match(/^(\d{1,2}):(\d{2})$/);
+  return m ? clock(Number(m[1]) * 60 + Number(m[2])) : "";
+}
+
+function legLine(leg: FlightLeg): string {
+  const when = `${formatRange(leg.date, leg.date).replace(/–\d+$/, "")}${leg.time ? ` ${timeLabel(leg.time)}` : ""}`;
+  return `${leg.flight} ${leg.from}→${leg.to}, ${when}`;
+}
+
+function groupMessage(place: Place, g: GroupFlight): string {
+  return [
+    `Flights for ${place.name}. Let's all book these exact ones:`,
+    `Out: ${legLine(g.outbound)}`,
+    g.ret ? `Back: ${legLine(g.ret)}` : null,
+    g.link ? `Google Flights: ${g.link}` : `Find it: ${googleExactFlight(g.outbound.flight, g.outbound.from, g.outbound.to, g.outbound.date)}`,
+    "Tick yourself off as booked in TripTable once you have a confirmation.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function fastest(gw: Gateway) {
+  return gw.ground.reduce((a, b) => (b.mins < a.mins ? b : a));
+}
 
 // ---------- main view ----------
 export function FlightsView() {
-  const { state, dispatch } = useTripTable();
+  const { state } = useTripTable();
   const friends = useFriends();
   const fs = useFlights();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const timers = useRef<number[]>([]);
 
-  useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
-
-  // pick a sensible destination if none chosen yet
   const place: Place | null = (fs.destId ? PLACE_BY_ID.get(fs.destId) : null) ?? (state.trips[0] ? PLACE_BY_ID.get(state.trips[0].placeId) ?? null : null);
 
   const [out, back] = useMemo<[string, string]>(() => {
@@ -115,35 +154,9 @@ export function FlightsView() {
   const dest = useMemo(() => (place ? resolveDestination(place) : null), [place]);
   const guidance = place ? travelGuidance(place.iso) : null;
   const blocked = guidance?.level === "blocked";
+  const trip = place ? state.trips.find((t) => t.placeId === place.id) : undefined;
+  const crewSize = fs.crew.length + 1;
 
-  const prefs: Prefs = {
-    gateways: fs.gateways,
-    boycottAvelo: fs.boycottAvelo,
-    nonstopOnly: fs.nonstopOnly,
-    includeGround: fs.includeGround,
-    window: fs.window,
-    groupSize: fs.crew.length + 1,
-  };
-  const prefsKey = JSON.stringify(prefs);
-
-  const results = useMemo(() => {
-    if (!dest || blocked) return [];
-    return rank(search(dest, out, back, prefs), fs.sort, fs.moneyWeight);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dest, out, back, prefsKey, fs.sort, fs.moneyWeight, blocked]);
-
-  const side = useMemo(() => {
-    if (!dest || blocked) return null;
-    return {
-      advice: advice(dest, out, back, prefs),
-      cal: calendar(dest, out, back, prefs),
-      airports: airportComparison(dest, out, back, prefs),
-      avelo: fs.boycottAvelo ? aveloCount(dest, out, back, prefs) : 0,
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dest, out, back, prefsKey, blocked]);
-
-  // friends whose trips overlap this destination and dates
   const overlapping = useMemo(() => {
     if (!place) return [];
     return DIRECTORY.flatMap((person) =>
@@ -168,55 +181,23 @@ export function FlightsView() {
 
   function setDates(o: string, b: string) {
     flightStore.set({ out: o, back: daysBetween(o, b) >= 0 ? b : addDays(o, 7) });
-    setShowAll(false);
   }
 
-  function saveFlight(o: Option) {
-    if (!place) return;
-    const line = o.flightNo ? `✈ ${o.flightNo} from ${o.gateway}, leave campus ${clock(o.leaveBy)}, ${formatMoney(o.totalEach)} pp` : `🚆 ${o.title}, ${formatMoney(o.totalEach)} pp`;
-    flightStore.set((s) => ({
-      saved: [
-        { id: `${Date.now()}`, placeId: place.id, title: o.title, gateway: o.gateway, flightNo: o.flightNo, out, back, totalEach: o.totalEach, leaveBy: clock(o.leaveBy) },
-        ...s.saved.filter((x) => !(x.placeId === place.id && x.out === out)),
-      ],
-    }));
-    const existing = state.trips.find((t) => t.placeId === place.id);
-    const trip: Trip = existing
-      ? { ...existing, start: out, end: back, note: [existing.note.replace(/\n?[✈🚆].*$/u, ""), line].filter(Boolean).join("\n") }
-      : { id: `trip-${place.id}-${Date.now()}`, placeId: place.id, season: state.season, start: out, end: back, note: line, friendNetids: fs.crew };
-    dispatch({ type: "saveTrip", trip, message: `Saved ${o.flightNo ?? o.title} to your itinerary` });
-  }
-
-  function watch(o: Option) {
-    if (!place) return;
-    flightStore.set((s) => ({ alerts: [{ id: `${Date.now()}`, placeId: place.id, out, back, price: o.totalEach }, ...s.alerts.filter((a) => !(a.placeId === place.id && a.out === out))] }));
-    dispatch({ type: "toast", message: `Watching fares to ${place.name}` });
-    if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
-    // Demo: simulate a drop so the alert flow can be shown live.
-    const name = place.name;
-    timers.current.push(
-      window.setTimeout(() => {
-        const drop = Math.max(9, Math.round(o.totalEach * 0.08));
-        const msg = `Price drop: ${name} now ${formatMoney(o.totalEach - drop)} (−${formatMoney(drop)})`;
-        dispatch({ type: "toast", message: msg });
-        if ("Notification" in window && Notification.permission === "granted") new Notification("TripTable fare alert", { body: msg });
-      }, 8000),
-    );
-  }
-
-  const visible = showAll ? results : results.slice(0, 6);
+  const gateways = GATEWAYS.filter((g) => fs.gateways.includes(g.code) && !(fs.boycottAvelo && g.code === "HVN"));
   const upcomingBreaks = BREAKS.filter((b) => daysBetween(todayISO(), b.end) > 0);
+  const destCode = dest?.airport?.code ?? "";
 
   return (
     <div className="fl-page">
       <header className="fl-head">
         <div>
           <h2>Flights</h2>
-          <p className="lede">Door to door from Old Campus: the ride to the airport, the flight, and the way back. Round-trip, per person.</p>
+          <p className="lede">
+            Pick the airport and the ride from Old Campus here, then search and book on Google Flights. Lock the exact flight on your trip so the whole group books the same one.
+          </p>
         </div>
       </header>
 
-      {/* ---------- search bar ---------- */}
       <section className="fl-search">
         <div className="fl-field fl-dest">
           <span className="field-label">To</span>
@@ -246,7 +227,6 @@ export function FlightsView() {
                     onMouseDown={() => {
                       flightStore.set({ destId: p.id, out: null, back: null });
                       setOpen(false);
-                      setShowAll(false);
                     }}
                   >
                     <span>{p.name}</span>
@@ -276,13 +256,6 @@ export function FlightsView() {
       </section>
 
       <section className="fl-toolbar">
-        <div className="seg fl-seg">
-          {(["best", "cheapest", "fastest", "greenest"] as SortMode[]).map((m) => (
-            <button key={m} type="button" className={fs.sort === m ? "active" : ""} onClick={() => flightStore.set({ sort: m })}>
-              {m === "best" ? "Best" : m === "cheapest" ? "Cheapest" : m === "fastest" ? "Fastest" : "Greenest"}
-            </button>
-          ))}
-        </div>
         <div className="fl-crew">
           <span className="field-label">Flying with</span>
           {friends.length ? (
@@ -300,86 +273,52 @@ export function FlightsView() {
             <span className="fl-muted">Add friends to split rides</span>
           )}
         </div>
-        <button type="button" className={showFilters ? "fl-ghost on" : "fl-ghost"} onClick={() => setShowFilters((v) => !v)}>
-          Filters{fs.nonstopOnly || fs.window !== "any" || fs.gateways.length < ALL_GATEWAYS.length ? " •" : ""}
-        </button>
+        <div className="fl-crew">
+          <span className="field-label">Airports</span>
+          {GATEWAYS.map((g) => {
+            const on = fs.gateways.includes(g.code);
+            const avelo = g.code === "HVN" && fs.boycottAvelo;
+            return (
+              <button
+                key={g.code}
+                type="button"
+                disabled={avelo}
+                className={on && !avelo ? "fl-chip on" : "fl-chip"}
+                title={avelo ? "Hidden by your Avelo boycott" : `${g.name}, ${g.city}`}
+                onClick={() =>
+                  flightStore.set((s) => {
+                    const next = on ? s.gateways.filter((x) => x !== g.code) : [...s.gateways, g.code];
+                    return { gateways: next.length ? next : s.gateways };
+                  })
+                }
+              >
+                {g.code}
+              </button>
+            );
+          })}
+        </div>
       </section>
 
-      {showFilters ? (
-        <section className="fl-filters">
-          <div className="fl-frow">
-            <span className="field-label">Airports</span>
-            <div className="choice-row">
-              {GATEWAYS.map((g) => {
-                const on = fs.gateways.includes(g.code);
-                return (
-                  <button
-                    key={g.code}
-                    type="button"
-                    className={on ? "on" : ""}
-                    title={`${g.name}, ${g.city}`}
-                    onClick={() =>
-                      flightStore.set((s) => {
-                        const next = on ? s.gateways.filter((x) => x !== g.code) : [...s.gateways, g.code];
-                        return { gateways: next.length ? next : s.gateways };
-                      })
-                    }
-                  >
-                    {g.code}
-                    {g.code === "HVN" && fs.boycottAvelo ? " (Avelo off)" : ""}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div className="fl-frow">
-            <span className="field-label">Departs</span>
-            <div className="choice-row">
-              {(["any", "morning", "afternoon", "evening"] as const).map((w) => (
-                <button key={w} type="button" className={fs.window === w ? "on" : ""} onClick={() => flightStore.set({ window: w })}>
-                  {w[0]?.toUpperCase() + w.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="fl-frow">
-            <label className="check">
-              <input type="checkbox" checked={fs.nonstopOnly} onChange={(e) => flightStore.set({ nonstopOnly: e.target.checked })} /> Nonstop only
-            </label>
-            <label className="check">
-              <input type="checkbox" checked={fs.includeGround} onChange={(e) => flightStore.set({ includeGround: e.target.checked })} /> Include trains, buses, driving
-            </label>
-          </div>
-          <div className="fl-frow">
-            <span className="field-label">“Best” leans toward</span>
-            <span className="fl-muted">time</span>
-            <input type="range" min={0} max={100} value={Math.round(fs.moneyWeight * 100)} onChange={(e) => flightStore.set({ moneyWeight: Number(e.target.value) / 100 })} />
-            <span className="fl-muted">money</span>
-          </div>
-        </section>
-      ) : null}
-
-      {/* ---------- body ---------- */}
-      {!place ? (
-        <p className="fl-empty">Pick a destination above, or open any place on the map and press “Find flights”.</p>
+      {!place || !dest ? (
+        <p className="fl-empty">Pick a destination above, or open any place on the map and press “Plan getting there”.</p>
       ) : blocked && guidance ? (
         <div className="guidance blocked fl-blocked">
-          <strong>{guidance.title}.</strong> {guidance.detail} Flight search is off for {place.name}.
+          <strong>{guidance.title}.</strong> {guidance.detail} Flight planning is off for {place.name}.
         </div>
       ) : (
         <div className="fl-grid">
           <div className="fl-results">
             <p className="fl-summary">
-              <strong>{results.length} ways</strong> from Yale to {place.name}
-              {dest?.airport ? ` (${dest.airport.code})` : ""} · {formatRange(out, back)}
-              {fs.crew.length ? ` · ${fs.crew.length + 1} people, Ubers split` : ""}
+              Yale to <strong>{place.name}</strong>
+              {dest.airport ? ` (${dest.airport.code}, ${dest.airport.city})` : ""} · {formatRange(out, back)}
+              {fs.crew.length ? ` · ${crewSize} people, rides split` : ""}
             </p>
             {guidance && guidance.level === "regional" ? <div className="guidance regional">{guidance.title}. {guidance.detail}</div> : null}
             {overlapping.length ? (
               <div className="fl-overlap">
-                {overlapping.slice(0, 3).map(({ person, trip, isFriend }) => (
-                  <div key={person.netid + trip.start}>
-                    <strong>{isFriend ? person.name : `A ${person.college} student`}</strong> is there {formatRange(...rollForward(trip.start, trip.end))}.
+                {overlapping.slice(0, 3).map(({ person, trip: t, isFriend }) => (
+                  <div key={person.netid + t.start}>
+                    <strong>{isFriend ? person.name : `A ${person.college} student`}</strong> is there {formatRange(...rollForward(t.start, t.end))}.
                     {isFriend && !fs.crew.includes(person.netid) ? (
                       <button type="button" className="textlink" onClick={() => flightStore.set((s) => ({ crew: [...s.crew, person.netid] }))}>
                         Fly together
@@ -389,41 +328,44 @@ export function FlightsView() {
                 ))}
               </div>
             ) : null}
-            {results.length === 0 ? <p className="fl-empty">Nothing matches these filters. Turn on more airports or allow stops.</p> : null}
-            <ul className="fl-list">
-              {visible.map((o, i) => (
-                <OptionCard key={o.id} o={o} top={i === 0} destCode={dest?.airport?.code ?? place.name} transfer={dest?.transfer ?? null} onSave={() => saveFlight(o)} onWatch={() => watch(o)} />
-              ))}
-            </ul>
-            {!showAll && results.length > 6 ? (
-              <button type="button" className="fl-more" onClick={() => setShowAll(true)}>
-                Show {results.length - 6} more
-              </button>
-            ) : null}
-            {side && side.avelo > 0 ? <p className="fl-hidden">✊ {side.avelo} Avelo option{side.avelo > 1 ? "s" : ""} hidden by your boycott.</p> : null}
-          </div>
 
-          {side ? (
-            <aside className="fl-side">
-              <AdviceCard a={side.advice} />
-              <div className="fl-card">
-                <h3>Flexible dates</h3>
-                <p className="fl-muted fl-small">Same trip length, shifted. Cheapest in green.</p>
-                <CalendarStrip days={side.cal} out={out} onPick={(d) => setDates(d, addDays(d, daysBetween(out, back)))} />
-              </div>
-              <div className="fl-card">
-                <h3>Which airport?</h3>
-                <p className="fl-muted fl-small">Cheapest round trip including the ride there and back.</p>
-                <AirportTable rows={side.airports} onPick={(code) => flightStore.set({ gateways: [code] })} />
-                {fs.gateways.length < ALL_GATEWAYS.length ? (
+            {dest.groundRoutes.length ? <GroundCards dest={dest} crewSize={crewSize} /> : null}
+
+            {dest.airport ? (
+              <>
+                {fs.boycottAvelo ? <p className="fl-hidden">✊ Tweed is hidden. On Google Flights, untick Avelo under Airlines too.</p> : null}
+                <div className="fl-allairports">
+                  <div>
+                    <strong>Compare every nearby airport at once</strong>
+                    <p className="fl-muted fl-small">Opens Google Flights with all New York airports, then try Hartford and Boston below.</p>
+                  </div>
+                  <a className="primary fl-book" href={googleFlights("New York", destCode, out, back)} target="_blank" rel="noreferrer">
+                    Search NYC airports ↗
+                  </a>
+                </div>
+                <ul className="fl-list">
+                  {gateways.map((gw) => (
+                    <GatewayCard key={gw.code} gw={gw} dest={dest} out={out} back={back} crewSize={crewSize} />
+                  ))}
+                </ul>
+                {gateways.length < ALL_GATEWAYS.length - (fs.boycottAvelo ? 1 : 0) ? (
                   <button type="button" className="textlink" onClick={() => flightStore.set({ gateways: ALL_GATEWAYS })}>
                     Show all airports
                   </button>
                 ) : null}
-              </div>
-              <SavedCard />
-            </aside>
-          ) : null}
+                {dest.transfer ? (
+                  <p className="fl-muted fl-small">
+                    On arrival: {dest.transfer.label}, about {duration(dest.transfer.mins)} and {formatMoney(dest.transfer.cost)}.
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+
+          <aside className="fl-side">
+            <GroupFlightCard key={`${place.id}-${trip?.groupFlight?.setAt ?? ""}`} place={place} dest={dest} trip={trip} out={out} back={back} />
+            {dest.airport ? <TipsCard domestic={dest.domestic} /> : null}
+          </aside>
         </div>
       )}
     </div>
@@ -431,218 +373,286 @@ export function FlightsView() {
 }
 
 // ---------- pieces ----------
-function OptionCard({
-  o,
-  top,
-  destCode,
-  transfer,
-  onSave,
-  onWatch,
-}: {
-  o: Option;
-  top: boolean;
-  destCode: string;
-  transfer: { label: string; mins: number } | null;
-  onSave: () => void;
-  onWatch: () => void;
-}) {
-  const air = o.carrier ? AIRLINES[o.carrier] : null;
+function GatewayCard({ gw, dest, out, back, crewSize }: { gw: Gateway; dest: Destination; out: string; back: string; crewSize: number }) {
+  const to = dest.airport?.code ?? "";
+  const quick = fastest(gw);
+  const leaveBefore = quick.mins + gw.security;
   return (
-    <li className={top ? "fl-opt top" : "fl-opt"}>
-      <div className="fl-opt-main">
+    <li className="fl-opt">
+      <div>
         <div className="fl-opt-title">
-          {air ? <i className="fl-dot" style={{ background: air.color }} /> : <span>{o.kind === "bus" ? "🚌" : o.kind === "drive" ? "🚗" : o.kind === "ferry" ? "⛴" : "🚆"}</span>}
-          <strong>{o.title}</strong>
-          {o.kind === "flight" ? <span className="fl-muted">from {o.gateway}</span> : null}
-          {o.badges.map((b) => (
-            <span key={b} className={`fl-badge b-${b.toLowerCase()}`}>
-              {b}
-            </span>
-          ))}
+          <strong>
+            {gw.code} · {gw.name}
+          </strong>
+          <span className="fl-muted fl-small">{gw.city}</span>
         </div>
         <div className="fl-legs">
-          {o.ground ? <span className="fl-leg">{o.ground.label} · {duration(o.ground.mins)}</span> : null}
-          {o.kind === "flight" ? (
-            <span className="fl-leg">
-              {o.flightNo} · {o.gateway} → {o.via ? `${o.via} → ` : ""}
-              {destCode} · {duration(o.travelMins)}
-            </span>
-          ) : (
-            <span className="fl-leg">{duration(o.travelMins)}</span>
-          )}
-          {transfer && o.kind === "flight" ? <span className="fl-leg">{transfer.label} · {duration(transfer.mins)}</span> : null}
+          {gw.ground.map((leg) => {
+            const each = leg.splittable ? leg.cost / crewSize : leg.cost;
+            return (
+              <span key={leg.id} className="fl-leg">
+                {leg.label} · ~{duration(leg.mins)} · ~{formatMoney(Math.round(each))}
+                {leg.splittable && crewSize > 1 ? " each" : ""}
+              </span>
+            );
+          })}
         </div>
         <div className="fl-meta">
           <span>
-            Leave campus <b>{clock(o.leaveBy)}</b>
+            Leave campus about <b>{duration(leaveBefore)}</b> before departure
           </span>
-          <span>
-            Departs <b>{clock(o.depMins)}</b>
-          </span>
-          <span>
-            <b>{duration(o.doorMins)}</b> door to door
-          </span>
-          <span>{o.co2} kg CO₂</span>
+          <a href={directions(`${gw.name} Airport`)} target="_blank" rel="noreferrer">
+            Directions from Old Campus ↗
+          </a>
         </div>
       </div>
       <div className="fl-opt-side">
-        <div className="fl-price">{formatMoney(o.totalEach)}</div>
-        <div className="fl-muted fl-small">
-          {o.kind === "flight" ? `fares ${formatMoney(o.outFare + o.backFare)} + rides ${formatMoney(o.groundEach + o.transferEach)}` : `${formatMoney(o.outFare)} each way`}
-        </div>
-        <div className="fl-actions">
-          <button type="button" className="fl-ghost" title="Alert me if this gets cheaper" onClick={onWatch}>
-            🔔
-          </button>
-          <button type="button" className="fl-ghost" onClick={onSave}>
-            Save
-          </button>
-          <a className="primary fl-book" href={o.bookUrl} target="_blank" rel="noreferrer">
-            Book ↗
-          </a>
-        </div>
+        <a className="primary fl-book" href={googleFlights(gw.code, to, out, back)} target="_blank" rel="noreferrer">
+          {gw.code} → {to} on Google Flights ↗
+        </a>
+        <span className="fl-muted fl-small">Prices and booking on Google</span>
       </div>
     </li>
   );
 }
 
-function AdviceCard({ a }: { a: ReturnType<typeof advice> }) {
-  const label = { now: "Book now", good: "Good time to book", wait: "Wait", past: "Past" }[a.status];
-  const pts = a.curve;
-  const W = 280;
-  const H = 90;
-  const P = 10;
-  let chart = null;
-  if (pts.length > 2) {
-    const xs = pts.map((p) => p.day);
-    const ys = pts.map((p) => p.price);
-    const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys) * 0.96, Math.max(...ys) * 1.04];
-    const X = (v: number) => P + ((v - x0) / (x1 - x0 || 1)) * (W - 2 * P);
-    const Y = (v: number) => H - P - ((v - y0) / (y1 - y0 || 1)) * (H - 2 * P);
-    const line = (arr: typeof pts) => arr.map((p) => `${X(p.day).toFixed(1)},${Y(p.price).toFixed(1)}`).join(" ");
-    const past = pts.filter((p) => p.day <= 0);
-    const fut = pts.filter((p) => p.day >= 0);
-    const low = fut.reduce<(typeof pts)[number] | null>((m, p) => (!m || p.price < m.price ? p : m), null);
-    chart = (
-      <svg className="fl-spark" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Fare forecast">
-        <polyline points={line(past)} fill="none" stroke="var(--color-track)" strokeWidth="2" strokeDasharray="4 4" />
-        <polyline points={line(fut)} fill="none" stroke="var(--color-primary)" strokeWidth="2.5" />
-        <line x1={X(0)} x2={X(0)} y1={P} y2={H - P} stroke="var(--color-border)" />
-        {low ? <circle cx={X(low.day)} cy={Y(low.price)} r="4" fill="#0b7a32" /> : null}
-      </svg>
+function GroundCards({ dest, crewSize }: { dest: Destination; crewSize: number }) {
+  return (
+    <div className="fl-card">
+      <h3>Skip the airport</h3>
+      <p className="fl-muted fl-small">{dest.place.name} is close enough by train, bus or car. Times and prices are rough estimates.</p>
+      <ul className="fl-ground">
+        {dest.groundRoutes.map((r) => {
+          const each = r.splittable ? r.cost / crewSize : r.cost;
+          return (
+            <li key={r.label}>
+              <div>
+                <strong>{r.label}</strong>
+                <span className="fl-muted fl-small">
+                  {" "}
+                  · ~{duration(r.mins)} · ~{formatMoney(Math.round(each))}
+                  {r.splittable && crewSize > 1 ? " each" : ""} one way
+                </span>
+              </div>
+              <div className="fl-actions">
+                {GROUND_LINKS[r.kind].map((l) => (
+                  <a key={l.label} className="textlink" href={l.url} target="_blank" rel="noreferrer">
+                    {l.label} ↗
+                  </a>
+                ))}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <a className="primary fl-book" href={directions(dest.place.name, "transit")} target="_blank" rel="noreferrer">
+        Transit directions from Old Campus ↗
+      </a>
+    </div>
+  );
+}
+
+function emptyLeg(date: string, from: string, to: string): { flight: string; date: string; time: string; from: string; to: string } {
+  return { flight: "", date, time: "", from, to };
+}
+
+function GroupFlightCard({ place, dest, trip, out, back }: { place: Place; dest: Destination; trip: Trip | undefined; out: string; back: string }) {
+  const { state, dispatch } = useTripTable();
+  const fs = useFlights();
+  const g = trip?.groupFlight;
+  const destCode = dest.airport?.code ?? "";
+  const firstGw = fs.gateways.find((c) => !(fs.boycottAvelo && c === "HVN")) ?? "JFK";
+  const [editing, setEditing] = useState(false);
+  const [outLeg, setOutLeg] = useState(() => g?.outbound ?? emptyLeg(out, firstGw, destCode));
+  const [retLeg, setRetLeg] = useState(() => g?.ret ?? emptyLeg(back, destCode, firstGw));
+  const [link, setLink] = useState(g?.link ?? "");
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  if (!dest.airport) {
+    return (
+      <div className="fl-card">
+        <h3>Group travel</h3>
+        <p className="fl-muted fl-small">No flight needed for {place.name}. Agree on a train or bus time in the group chat and add it to the trip note.</p>
+      </div>
     );
   }
-  return (
-    <div className="fl-card">
-      <span className={`fl-status s-${a.status}`}>{label}</span>
-      <p className="fl-headline">{a.headline}</p>
-      {chart}
-      {chart ? <p className="fl-muted fl-small">Dashed: last 3 weeks. Blue: forecast by booking day. Green dot: predicted low.</p> : null}
-      <dl className="fl-kv">
-        <div>
-          <dt>Cheapest today</dt>
-          <dd>{a.now ? formatMoney(a.now) : "—"}</dd>
-        </div>
-        {a.low && a.lowOn ? (
-          <div>
-            <dt>Predicted low</dt>
-            <dd>
-              {formatMoney(a.low)} <span className="fl-muted">if booked {shortDate(a.lowOn)}</span>
-            </dd>
-          </div>
-        ) : null}
-        {a.bookBy ? (
-          <div>
-            <dt>Book by</dt>
-            <dd>{shortDate(a.bookBy)}</dd>
-          </div>
-        ) : null}
-      </dl>
-    </div>
-  );
-}
 
-function CalendarStrip({ days, out, onPick }: { days: { date: string; price: number | null }[]; out: string; onPick: (d: string) => void }) {
-  const prices = days.map((d) => d.price).filter((p): p is number => p !== null).sort((a, b) => a - b);
-  const lo = prices[Math.floor(prices.length / 3)] ?? 0;
-  const hi = prices[Math.floor((prices.length * 2) / 3)] ?? Infinity;
+  function save() {
+    const outNo = normalizeFlight(outLeg.flight);
+    if (!outNo) {
+      setError("Enter the outbound flight number like B6 1503.");
+      return;
+    }
+    const retNo = retLeg.flight.trim() ? normalizeFlight(retLeg.flight) : null;
+    if (retLeg.flight.trim() && !retNo) {
+      setError("The return flight number doesn't look right. Try UA 2214.");
+      return;
+    }
+    if (link.trim() && !/^https:\/\/(www\.)?(google\.[a-z.]+\/travel|goo\.gl|g\.co)\//i.test(link.trim())) {
+      setError("Paste a Google Flights share link, or leave it blank.");
+      return;
+    }
+    const base: Trip = trip ?? {
+      id: `trip-${place.id}-${Date.now()}`,
+      placeId: place.id,
+      season: state.season,
+      start: out,
+      end: back,
+      note: "",
+      friendNetids: fs.crew,
+    };
+    const friendNetids = Array.from(new Set([...base.friendNetids, ...fs.crew]));
+    const groupFlight: GroupFlight = {
+      outbound: { ...outLeg, flight: outNo, from: outLeg.from.toUpperCase(), to: outLeg.to.toUpperCase() },
+      ret: retNo ? { ...retLeg, flight: retNo, from: retLeg.from.toUpperCase(), to: retLeg.to.toUpperCase() } : null,
+      link: link.trim(),
+      setBy: ME.netid,
+      booked: [],
+      setAt: new Date().toISOString(),
+    };
+    dispatch({ type: "saveTrip", trip: { ...base, start: outLeg.date, end: retNo ? retLeg.date : base.end, friendNetids, groupFlight }, message: `Locked ${outNo} for the group` });
+    setEditing(false);
+    setError("");
+  }
+
+  if (g && trip && !editing) {
+    const people = travelersOf(trip);
+    const done = people.filter((id) => g.booked.includes(id));
+    return (
+      <div className="fl-card fl-group">
+        <h3>Group flight</h3>
+        <p className="fl-muted fl-small">Everyone books these exact flights. Set by {nameOf(g.setBy)}.</p>
+        {[g.outbound, g.ret].filter((leg): leg is FlightLeg => Boolean(leg)).map((leg, i) => (
+          <div key={i} className="fl-legcard">
+            <div>
+              <span className="field-label">{i === 0 ? "Out" : "Back"}</span>
+              <strong>{legLine(leg)}</strong>
+            </div>
+            <div className="fl-actions">
+              <a className="textlink" href={googleExactFlight(leg.flight, leg.from, leg.to, leg.date)} target="_blank" rel="noreferrer">Find on Google Flights ↗</a>
+              <a className="textlink" href={flightStatus(leg.flight, leg.date)} target="_blank" rel="noreferrer">Status ↗</a>
+            </div>
+          </div>
+        ))}
+        {g.link ? (
+          <a className="primary fl-book" href={g.link} target="_blank" rel="noreferrer">Open the shared Google Flights link ↗</a>
+        ) : null}
+        <button
+          type="button"
+          className="fl-ghost"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(groupMessage(place, g));
+              setCopied(true);
+              window.setTimeout(() => setCopied(false), 2000);
+            } catch {
+              window.prompt("Copy this to your group chat:", groupMessage(place, g));
+            }
+          }}
+        >
+          {copied ? "Copied" : "Copy message for the group chat"}
+        </button>
+        <span className="field-label">Booked? {done.length}/{people.length}</span>
+        <ul className="fl-booked">
+          {people.map((id) => (
+            <li key={id}>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={g.booked.includes(id)}
+                  onChange={(e) => {
+                    const booked = e.target.checked ? [...g.booked, id] : g.booked.filter((x) => x !== id);
+                    dispatch({ type: "saveTrip", trip: { ...trip, groupFlight: { ...g, booked } }, message: e.target.checked ? `${nameOf(id)} booked` : "Unmarked" });
+                  }}
+                />
+                {nameOf(id)}
+              </label>
+            </li>
+          ))}
+        </ul>
+        {done.length < people.length ? <p className="fl-muted fl-small">Waiting on {people.filter((id) => !g.booked.includes(id)).map(nameOf).join(", ")}.</p> : <p className="fl-ok">Everyone's on the same flight.</p>}
+        <button
+          type="button"
+          className="textlink"
+          onClick={() => {
+            if (g.booked.length && !window.confirm("Changing the flight clears everyone's booked status. Continue?")) return;
+            setEditing(true);
+          }}
+        >
+          Change flight
+        </button>
+      </div>
+    );
+  }
+
+  const legFields = (leg: typeof outLeg, set: (l: typeof outLeg) => void, label: string) => (
+    <fieldset className="fl-legform">
+      <legend>{label}</legend>
+      <div className="fl-legrow">
+        <label>
+          Flight
+          <input value={leg.flight} placeholder="B6 1503" onChange={(e) => set({ ...leg, flight: e.target.value })} />
+        </label>
+        <label>
+          From
+          <input value={leg.from} maxLength={3} onChange={(e) => set({ ...leg, from: e.target.value.toUpperCase() })} />
+        </label>
+        <label>
+          To
+          <input value={leg.to} maxLength={3} onChange={(e) => set({ ...leg, to: e.target.value.toUpperCase() })} />
+        </label>
+      </div>
+      <div className="fl-legrow">
+        <label>
+          Date
+          <input type="date" value={leg.date} onChange={(e) => set({ ...leg, date: e.target.value })} />
+        </label>
+        <label>
+          Departs
+          <input type="time" value={leg.time} onChange={(e) => set({ ...leg, time: e.target.value })} />
+        </label>
+      </div>
+    </fieldset>
+  );
+
   return (
-    <div className="fl-cal">
-      {days.map((d) => {
-        const dt = new Date(`${d.date}T12:00:00Z`);
-        const cls = d.price === null ? "" : d.price <= lo ? "lo" : d.price >= hi ? "hi" : "";
-        return (
-          <button key={d.date} type="button" className={`${cls} ${d.date === out ? "sel" : ""}`} onClick={() => onPick(d.date)}>
-            <span>{dt.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" })} {dt.getUTCDate()}</span>
-            <b>{d.price ? formatMoney(d.price) : "—"}</b>
+    <div className="fl-card fl-group">
+      <h3>Lock the group flight</h3>
+      <p className="fl-muted fl-small">
+        Once someone picks a flight on Google Flights, enter its flight numbers here. They're saved on your {place.name} trip with a message to send the group and a booked checklist, so nobody ends up on a different flight.
+      </p>
+      {legFields(outLeg, setOutLeg, "Out")}
+      {legFields(retLeg, setRetLeg, "Back (optional)")}
+      <label className="fl-field">
+        <span className="field-label">Google Flights share link (optional)</span>
+        <input value={link} placeholder="https://www.google.com/travel/flights/s/…" onChange={(e) => setLink(e.target.value)} />
+      </label>
+      {error ? <p className="form-error">{error}</p> : null}
+      <div className="fl-actions">
+        <button type="button" className="primary" onClick={save}>
+          {trip ? "Lock flight on trip" : "Save trip and lock flight"}
+        </button>
+        {editing ? (
+          <button type="button" className="textlink" onClick={() => setEditing(false)}>
+            Cancel
           </button>
-        );
-      })}
+        ) : null}
+      </div>
     </div>
   );
 }
 
-function AirportTable({ rows, onPick }: { rows: ReturnType<typeof airportComparison>; onPick: (code: string) => void }) {
-  const best = Math.min(...rows.map((r) => r.price ?? Infinity));
-  return (
-    <table className="fl-airports">
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.gw.code} className={r.price === best ? "best" : ""} onClick={() => r.price && onPick(r.gw.code)}>
-            <td>
-              <b>{r.gw.code}</b> <span className="fl-muted">{r.gw.name}</span>
-            </td>
-            <td className="fl-num">{r.price ? formatMoney(r.price) : r.hidden ? "boycotted" : "no flights"}</td>
-            <td className="fl-num fl-muted">{r.mins ? duration(r.mins) : ""}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function SavedCard() {
-  const fs = useFlights();
-  const { dispatch } = useTripTable();
-  if (!fs.saved.length && !fs.alerts.length) return null;
+function TipsCard({ domestic }: { domestic: boolean }) {
   return (
     <div className="fl-card">
-      <h3>Saved & watching</h3>
-      <ul className="fl-saved">
-        {fs.saved.map((s) => (
-          <li key={s.id}>
-            <div>
-              <b>{PLACE_BY_ID.get(s.placeId)?.name}</b> · {formatRange(s.out, s.back)}
-              <div className="fl-muted fl-small">
-                {s.flightNo ?? s.title} from {s.gateway} · leave {s.leaveBy}
-              </div>
-            </div>
-            <span className="fl-num">{formatMoney(s.totalEach)}</span>
-            <button type="button" className="icon-btn" aria-label="Remove" onClick={() => flightStore.set((st) => ({ saved: st.saved.filter((x) => x.id !== s.id) }))}>
-              ×
-            </button>
-          </li>
-        ))}
-        {fs.alerts.map((a) => (
-          <li key={a.id}>
-            <div>
-              🔔 <b>{PLACE_BY_ID.get(a.placeId)?.name}</b> · {formatRange(a.out, a.back)}
-              <div className="fl-muted fl-small">Alert below {formatMoney(a.price)}</div>
-            </div>
-            <span />
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="Stop watching"
-              onClick={() => {
-                flightStore.set((st) => ({ alerts: st.alerts.filter((x) => x.id !== a.id) }));
-                dispatch({ type: "toast", message: "Alert removed" });
-              }}
-            >
-              ×
-            </button>
-          </li>
-        ))}
+      <h3>Booking on Google Flights</h3>
+      <ul className="fl-tips">
+        <li>Set the number of travelers before you compare, so the price shown is for the whole group.</li>
+        <li>Use <b>Date grid</b> and <b>Price graph</b> to find cheaper days around your break.</li>
+        <li>Turn on <b>Track prices</b> for an email when the fare moves.</li>
+        <li>{domestic ? "For domestic trips, book a few weeks to a couple of months out, earlier for Thanksgiving and spring break." : "For international trips, start looking a few months out, earlier for peak summer and winter break."}</li>
+        <li>One person picks the flight, the group locks it here, then everyone books it themselves.</li>
       </ul>
     </div>
   );

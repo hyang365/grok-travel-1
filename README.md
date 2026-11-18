@@ -16,11 +16,11 @@ https://hyang365.github.io/grok1/
 - **Catalog and filters:** sort and filter by affordability, safety, beauty, continent and type of trip.
 - **Friends:** add by NetID to see their plans and overlapping dates. Everyone else is just a count.
 - **Yale travel rules:** flags countries Yale won't sponsor (State Dept Level 4) and blocks flights there.
-- **Flights:** door-to-door round-trip prices from Old Campus through Tweed, Bradley, JFK, LGA, Newark or Logan, plus trains and buses for nearby trips. Sort by Best, Cheapest, Fastest or Greenest.
-  - **Boycott Avelo** with one switch.
-  - **Fly with friends:** Uber costs split automatically.
-  - **When to book:** a book-now-or-wait tip, cheaper nearby dates, and which airport is cheapest.
-  - **Save** to your Itinerary, set **fare alerts**, and **Book** on Google Flights.
+- **Flights:** plan the trip from Old Campus, then search and book on Google Flights. There's no in-app flight data.
+  - Every airport (Tweed, Bradley, JFK, LGA, Newark, Logan) with the ride from campus, split Uber cost, and when to leave, plus a one-click Google Flights search for that route and your dates.
+  - Trains and buses for nearby trips, with transit directions from Old Campus.
+  - **Lock the group flight:** enter the flight numbers someone picked on Google Flights. They're saved on the trip with a copyable group-chat message, an exact-flight search link, flight status, and a "who's booked" checklist.
+  - **Boycott Avelo** with one switch (hides Tweed, and reminds you to untick Avelo on Google Flights).
 - **Itinerary:** your trips, flights and friends in one place.
 - **Study Abroad:** Yale Summer Session Abroad, Yale in London and approved programs, each with the grants you can apply for (Summer Experience Grant, Light, Gilman, Boren and more) and student reviews. The map has a **Travel / Study abroad** switch.
 - **Real reviews:** places and programs are rated only by real student reviews. There are no seeded reviews. Posting requires an @yale.edu email.
@@ -43,7 +43,8 @@ Reported reviews land in the `review_reports` table for you to moderate in the S
 
 - Yalie counts, cohorts and history on the map and catalog (labeled "sample counts").
 - The friends directory and their trips (the NetIDs in Friends are fictional).
-- Flight prices, which are simulated by `src/flights/engine.ts`.
+- Ground-transport times and costs in `src/flights/engine.ts` are rough planning estimates.
+- The group flight and booked checklist are saved on your device. Friends see them via the copied message until accounts are shared.
 - Stays: hotel names and rough prices, with no ratings.
 
 # Grok Proof

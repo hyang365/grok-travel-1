@@ -1,21 +1,6 @@
-// Flight-finder preferences, saved flights and fare alerts.
+// Flight-planner preferences (destination, dates, airports, who you are flying with).
 // Kept apart from the main TripTable store so the existing reducer stays untouched.
 import { useSyncExternalStore } from "react";
-import type { SortMode } from "./engine";
-
-export type SavedFlight = {
-  id: string;
-  placeId: string;
-  title: string;
-  gateway: string;
-  flightNo: string | null;
-  out: string;
-  back: string;
-  totalEach: number;
-  leaveBy: string;
-};
-
-export type FareAlert = { id: string; placeId: string; out: string; back: string; price: number };
 
 export type FlightState = {
   boycottAvelo: boolean;
@@ -23,14 +8,7 @@ export type FlightState = {
   out: string | null;
   back: string | null;
   gateways: string[];
-  sort: SortMode;
-  moneyWeight: number;
-  nonstopOnly: boolean;
-  includeGround: boolean;
-  window: "any" | "morning" | "afternoon" | "evening";
   crew: string[]; // friend netids flying with you
-  saved: SavedFlight[];
-  alerts: FareAlert[];
 };
 
 const KEY = "triptable-flights-v1";
@@ -42,14 +20,7 @@ const defaults: FlightState = {
   out: null,
   back: null,
   gateways: ALL_GATEWAYS,
-  sort: "best",
-  moneyWeight: 0.6,
-  nonstopOnly: false,
-  includeGround: true,
-  window: "any",
   crew: [],
-  saved: [],
-  alerts: [],
 };
 
 function load(): FlightState {
@@ -57,11 +28,15 @@ function load(): FlightState {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { ...defaults };
     const data = JSON.parse(raw) as Partial<FlightState>;
-    const merged = { ...defaults, ...data };
+    const merged: FlightState = {
+      ...defaults,
+      boycottAvelo: Boolean(data.boycottAvelo),
+      destId: typeof data.destId === "string" ? data.destId : null,
+      out: typeof data.out === "string" ? data.out : null,
+      back: typeof data.back === "string" ? data.back : null,
+    };
     merged.gateways = Array.isArray(data.gateways) && data.gateways.length ? data.gateways.filter((g) => ALL_GATEWAYS.includes(g)) : ALL_GATEWAYS;
     if (!merged.gateways.length) merged.gateways = ALL_GATEWAYS;
-    merged.saved = Array.isArray(data.saved) ? data.saved : [];
-    merged.alerts = Array.isArray(data.alerts) ? data.alerts : [];
     merged.crew = Array.isArray(data.crew) ? data.crew : [];
     return merged;
   } catch {

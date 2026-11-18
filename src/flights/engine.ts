@@ -1,6 +1,6 @@
-// Flight + ground search engine for TripTable.
-// Prices are a deterministic demo model (booking curve, seasonality, airline type).
-// Swap `routeCarriers` / `fareFor` for a real API (Duffel, Amadeus, Kiwi) later.
+// Trip logistics for TripTable: which airport, how to get there from Old Campus, and links out.
+// There is no in-app flight data. Fares, schedules and booking all happen on Google Flights.
+// Ground times and costs below are rough estimates for planning, not quotes.
 
 import { parseISODate } from "../logic";
 import type { Place } from "../types";
@@ -70,56 +70,7 @@ export const GATEWAYS: Gateway[] = [
   },
 ];
 
-export const AIRLINES: Record<string, { name: string; color: string; ulcc?: boolean; legacy?: boolean }> = {
-  XP: { name: "Avelo", color: "#7b3fe4", ulcc: true },
-  B6: { name: "JetBlue", color: "#1b4d9c" },
-  DL: { name: "Delta", color: "#c8102e", legacy: true },
-  UA: { name: "United", color: "#005daa", legacy: true },
-  AA: { name: "American", color: "#0078d2", legacy: true },
-  WN: { name: "Southwest", color: "#f9b612" },
-  NK: { name: "Spirit", color: "#c9a600", ulcc: true },
-  MX: { name: "Breeze", color: "#00a3e0", ulcc: true },
-  F9: { name: "Frontier", color: "#00843d", ulcc: true },
-  BA: { name: "British Airways", color: "#2e5c99", legacy: true },
-  LH: { name: "Lufthansa", color: "#05164d", legacy: true },
-  AF: { name: "Air France", color: "#002157", legacy: true },
-  KL: { name: "KLM", color: "#00a1de", legacy: true },
-  IB: { name: "Iberia", color: "#d7192d" },
-  TP: { name: "TAP Portugal", color: "#00a650" },
-  AZ: { name: "ITA Airways", color: "#1b3c87" },
-  EI: { name: "Aer Lingus", color: "#006272" },
-  FI: { name: "Icelandair", color: "#003a7d" },
-  TK: { name: "Turkish", color: "#c70a0c" },
-  EK: { name: "Emirates", color: "#d71921", legacy: true },
-  QR: { name: "Qatar", color: "#5c0632", legacy: true },
-  NH: { name: "ANA", color: "#13448f", legacy: true },
-  JL: { name: "JAL", color: "#cc0000", legacy: true },
-  KE: { name: "Korean Air", color: "#00256c", legacy: true },
-  CX: { name: "Cathay Pacific", color: "#006564", legacy: true },
-  AC: { name: "Air Canada", color: "#d22630" },
-  AM: { name: "Aeroméxico", color: "#0b2343" },
-  CM: { name: "Copa", color: "#0a2d6e" },
-  AV: { name: "Avianca", color: "#da291c" },
-  LA: { name: "LATAM", color: "#e8114b" },
-  AT: { name: "Royal Air Maroc", color: "#c1272d" },
-  MS: { name: "EgyptAir", color: "#00265d" },
-  QF: { name: "Qantas", color: "#e40000", legacy: true },
-  SQ: { name: "Singapore", color: "#f99f1c", legacy: true },
-};
-
-const GATEWAY_CARRIERS: Record<string, { dom: string[]; intl: string[] }> = {
-  HVN: { dom: ["XP"], intl: [] },
-  BDL: { dom: ["WN", "DL", "AA", "UA", "B6", "MX", "NK", "F9"], intl: ["AC", "AA", "DL", "UA"] },
-  JFK: { dom: ["B6", "DL", "AA"], intl: ["BA", "AF", "KL", "LH", "IB", "TP", "AZ", "EI", "FI", "TK", "EK", "QR", "NH", "JL", "KE", "CX", "AM", "CM", "AV", "LA", "AT", "MS", "QF", "SQ", "DL", "B6", "AA"] },
-  LGA: { dom: ["DL", "AA", "UA", "WN", "B6", "NK", "F9"], intl: ["AC", "DL", "AA"] },
-  EWR: { dom: ["UA", "B6", "AA", "DL", "NK"], intl: ["UA", "LH", "TP", "TK", "EK", "SQ", "AF", "AM", "CM", "AV", "AT", "EI", "FI"] },
-  BOS: { dom: ["B6", "DL", "AA", "UA", "WN"], intl: ["BA", "LH", "AF", "KL", "IB", "TP", "AZ", "EI", "FI", "TK", "EK", "QR", "JL", "KE", "CX", "CM", "AT", "B6", "DL"] },
-};
-
-// Avelo nonstops from Tweed (demo schedule).
-const AVELO_FROM_HVN = new Set(["SJU", "CHS", "BNA", "MCO", "TPA", "FLL", "PBI", "RSW", "SAV", "MYR", "RDU", "LAS", "ATL", "BWI", "PIT"]);
-
-type Airport = { code: string; city: string; lat: number; lng: number; iso: string };
+export type Airport = { code: string; city: string; lat: number; lng: number; iso: string };
 
 const AIRPORTS: Airport[] = [
   { code: "SJU", city: "San Juan", lat: 18.439, lng: -66.002, iso: "PR" },
@@ -197,7 +148,7 @@ const COUNTRY_AIRPORT: Record<string, string> = {
 };
 
 // Places close enough that you skip the airport.
-type GroundRoute = { label: string; kind: "train" | "bus" | "drive" | "ferry"; mins: number; cost: number; co2: number; splittable?: boolean };
+export type GroundRoute = { label: string; kind: "train" | "bus" | "drive" | "ferry"; mins: number; cost: number; co2: number; splittable?: boolean };
 const GROUND_ROUTES: Record<string, GroundRoute[]> = {
   nyc: [
     { label: "Metro-North to Grand Central", kind: "train", mins: 125, cost: 21, co2: 3 },
@@ -243,59 +194,6 @@ export type Destination = {
   groundRoutes: GroundRoute[];
 };
 
-export type Option = {
-  id: string;
-  kind: "flight" | "train" | "bus" | "drive" | "ferry";
-  title: string;
-  gateway: string;
-  carrier: string | null;
-  flightNo: string | null;
-  stops: number;
-  via: string | null;
-  depMins: number;
-  travelMins: number; // gate to gate, or ground route
-  outFare: number;
-  backFare: number;
-  ground: GroundLeg | null;
-  groundEach: number; // per person, both ways
-  transferEach: number;
-  totalEach: number; // round trip, door to door, per person
-  doorMins: number; // one way, door to door
-  leaveBy: number;
-  co2: number;
-  transfers: number;
-  score: number;
-  badges: string[];
-  bookUrl: string;
-};
-
-export type Prefs = {
-  gateways: string[];
-  boycottAvelo: boolean;
-  nonstopOnly: boolean;
-  includeGround: boolean;
-  window: "any" | "morning" | "afternoon" | "evening";
-  groupSize: number;
-};
-
-// ---------- helpers ----------
-function hash(text: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-function seeded(seed: string): () => number {
-  let s = hash(seed) || 1;
-  return () => {
-    s ^= s << 13;
-    s ^= s >>> 17;
-    s ^= s << 5;
-    return ((s >>> 0) % 100000) / 100000;
-  };
-}
 export function km(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
   const rad = (x: number) => (x * Math.PI) / 180;
   const dLat = rad(b.lat - a.lat);
@@ -323,6 +221,7 @@ export function duration(mins: number): string {
   const h = Math.floor(m / 60);
   return h ? `${h}h${m % 60 ? ` ${m % 60}m` : ""}` : `${m}m`;
 }
+
 
 // ---------- Yale breaks (Yale College 2026–27; verify on the official calendar) ----------
 export const BREAKS = [
@@ -356,285 +255,45 @@ export function resolveDestination(place: Place): Destination {
   return { place, airport, transfer, domestic, groundRoutes };
 }
 
-// ---------- pricing model ----------
-function demand(date: string): number {
-  let m = 1;
-  const dow = new Date(parseISODate(date)).getUTCDay();
-  if (dow === 5 || dow === 0) m *= 1.14;
-  if (dow === 2 || dow === 3) m *= 0.91;
-  for (const b of BREAKS) {
-    for (const p of b.peaks) {
-      const gap = Math.abs(daysBetween(p, date));
-      if (gap === 0) m *= 1.36;
-      else if (gap === 1) m *= 1.17;
-      else if (gap === 2) m *= 1.06;
-    }
-  }
-  const month = new Date(parseISODate(date)).getUTCMonth();
-  if (month === 6 || month === 11) m *= 1.1;
-  return m;
-}
-function bookingCurve(daysOut: number, intl: boolean): number {
-  const [lo, hi] = intl ? [60, 150] : [21, 70];
-  if (daysOut < 3) return 1.75;
-  if (daysOut < 7) return 1.45;
-  if (daysOut < 14) return 1.22;
-  if (daysOut < lo) return 1.08;
-  if (daysOut <= hi) return 0.94;
-  return 1.04;
-}
-function routeCarriers(gateway: string, dest: Destination): { code: string; stops: number; via: string | null }[] {
-  if (!dest.airport) return [];
-  const pool = GATEWAY_CARRIERS[gateway];
-  if (!pool) return [];
-  let list = dest.domestic ? pool.dom : pool.intl;
-  if (gateway === "HVN") list = AVELO_FROM_HVN.has(dest.airport.code) ? ["XP"] : [];
-  const r = seeded(`${gateway}-${dest.airport.code}`);
-  const shuffled = [...list];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(r() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j] as string, shuffled[i] as string];
-  }
-  const dist = km(GATEWAYS.find((g) => g.code === gateway) ?? YALE, dest.airport);
-  const hubs: Record<string, string> = { DL: "ATL", UA: "ORD", AA: "CLT", B6: "FLL", WN: "BWI", NK: "FLL", F9: "DEN", MX: "CHS", AC: "YYZ", BA: "LHR", LH: "FRA", AF: "CDG", KL: "AMS", IB: "MAD", TP: "LIS", AZ: "FCO", EI: "DUB", FI: "KEF", TK: "IST", EK: "DXB", QR: "DOH", NH: "HND", JL: "HND", KE: "ICN", CX: "HKG", AM: "MEX", CM: "PTY", AV: "BOG", LA: "LIM", AT: "CMN", MS: "CAI", QF: "LAX", SQ: "FRA" };
-  return shuffled.slice(0, gateway === "HVN" ? 1 : 4).map((code) => {
-    const chance = gateway === "HVN" ? 1 : dist > 10000 ? 0.35 : dist > 6000 ? 0.65 : dist > 3000 ? 0.6 : 0.85;
-    const stops = r() < chance ? 0 : 1;
-    let via = stops ? (hubs[code] ?? "ATL") : null;
-    if (via && via === dest.airport?.code) via = "ATL";
-    return { code, stops, via };
-  });
-}
-function fareFor(gateway: string, dest: Destination, carrier: string, stops: number, date: string, bookedOn: string): number {
-  if (!dest.airport) return 0;
-  const gw = GATEWAYS.find((g) => g.code === gateway);
-  const dist = km(gw ?? YALE, dest.airport);
-  const info = AIRLINES[carrier];
-  let p = dest.domestic ? 55 + dist * 0.085 : 170 + dist * 0.075;
-  if (info?.ulcc) p *= 0.68;
-  if (info?.legacy) p *= 1.08;
-  if (stops) p *= 0.84;
-  const r = seeded(`${gateway}-${dest.airport.code}-${carrier}-${date}`);
-  p *= demand(date) * bookingCurve(daysBetween(bookedOn, date), !dest.domestic) * (0.86 + r() * 0.32);
-  return Math.round(p);
-}
-function depTime(gateway: string, code: string, carrier: string, date: string): number {
-  const r = seeded(`dep-${gateway}-${code}-${carrier}-${date}`);
-  return 6 * 60 + Math.floor(r() * 16) * 60 + (r() < 0.5 ? 0 : 30);
-}
-function inWindow(mins: number, w: Prefs["window"]): boolean {
-  if (w === "morning") return mins < 12 * 60;
-  if (w === "afternoon") return mins >= 12 * 60 && mins < 17 * 60;
-  if (w === "evening") return mins >= 17 * 60;
-  return true;
-}
-function googleFlights(from: string, to: string, out: string, back: string): string {
+
+// ---------- links out ----------
+const OLD_CAMPUS = "Old Campus, Yale University, New Haven, CT";
+
+/** Round-trip search on Google Flights. `from` can be an airport code or a city name. */
+export function googleFlights(from: string, to: string, out: string, back: string): string {
   return `https://www.google.com/travel/flights?q=${encodeURIComponent(`Flights from ${from} to ${to} on ${out} through ${back}`)}`;
 }
 
-// ---------- search ----------
-export function search(dest: Destination, out: string, back: string, prefs: Prefs, bookedOn = todayISO()): Option[] {
-  const options: Option[] = [];
-  const group = Math.max(1, prefs.groupSize);
-  if (dest.airport) {
-    for (const gw of GATEWAYS) {
-      if (!prefs.gateways.includes(gw.code)) continue;
-      for (const c of routeCarriers(gw.code, dest)) {
-        if (prefs.boycottAvelo && c.code === "XP") continue;
-        if (prefs.nonstopOnly && c.stops) continue;
-        const dep = depTime(gw.code, dest.airport.code, c.code, out);
-        if (!inWindow(dep, prefs.window)) continue;
-        const dist = km(gw, dest.airport);
-        const air = (dist / 820) * 60 + 35 + (c.stops ? 95 : 0);
-        const outFare = fareFor(gw.code, dest, c.code, c.stops, out, bookedOn);
-        const backFare = fareFor(gw.code, dest, c.code, c.stops, back, bookedOn);
-        const flightNo = `${c.code} ${100 + (hash(gw.code + dest.airport.code + c.code) % 2800)}`;
-        for (const g of gw.ground) {
-          const groundEach = Math.round((g.splittable ? g.cost / group : g.cost) * 2);
-          const transferEach = dest.transfer ? Math.round((dest.transfer.cost * 2) / Math.min(group, 4)) : 0;
-          const doorMins = g.mins + gw.security + air + 25 + (dest.transfer?.mins ?? 0);
-          options.push({
-            id: `${gw.code}-${c.code}-${g.id}`,
-            kind: "flight",
-            title: `${AIRLINES[c.code]?.name ?? c.code} ${c.stops ? `1 stop via ${c.via}` : "nonstop"}`,
-            gateway: gw.code,
-            carrier: c.code,
-            flightNo,
-            stops: c.stops,
-            via: c.via,
-            depMins: dep,
-            travelMins: air,
-            outFare,
-            backFare,
-            ground: g,
-            groundEach,
-            transferEach,
-            totalEach: outFare + backFare + groundEach + transferEach,
-            doorMins,
-            leaveBy: dep - gw.security - g.mins,
-            co2: Math.round(dist * (c.stops ? 0.23 : 0.2) + g.co2 * 2),
-            transfers: c.stops + (g.label.includes("+") ? 2 : 1),
-            score: 0,
-            badges: [],
-            bookUrl: googleFlights(gw.code, dest.airport.code, out, back),
-          });
-        }
-      }
-    }
-  }
-  if (prefs.includeGround || !dest.airport) {
-    dest.groundRoutes.forEach((route, i) => {
-      const r = seeded(`ground-${dest.place.id}-${i}-${out}`);
-      const m = Math.min(demand(out), 1.3);
-      const fare = route.splittable ? route.cost / group : route.cost;
-      const outFare = Math.round(fare * (route.kind === "drive" ? 1 : m));
-      const backFare = Math.round(fare * (route.kind === "drive" ? 1 : Math.min(demand(back), 1.3)));
-      const dep = 7 * 60 + Math.floor(r() * 12) * 60 + 15;
-      if (!inWindow(dep, prefs.window)) return;
-      options.push({
-        id: `ground-${dest.place.id}-${i}`,
-        kind: route.kind,
-        title: route.label,
-        gateway: route.kind === "drive" ? "Campus" : "Union Station",
-        carrier: null,
-        flightNo: null,
-        stops: 0,
-        via: null,
-        depMins: dep,
-        travelMins: route.mins,
-        outFare,
-        backFare,
-        ground: null,
-        groundEach: 0,
-        transferEach: 0,
-        totalEach: outFare + backFare,
-        doorMins: route.mins + (route.kind === "drive" ? 0 : 20),
-        leaveBy: dep - (route.kind === "drive" ? 0 : 20),
-        co2: route.co2 * 2,
-        transfers: route.label.includes("+") ? 2 : 0,
-        score: 0,
-        badges: [],
-        bookUrl: route.kind === "bus" ? "https://www.flixbus.com/" : route.kind === "train" ? "https://www.amtrak.com/" : "https://www.zipcar.com/",
-      });
-    });
-  }
-  return dedupe(options);
-}
-function dedupe(list: Option[]): Option[] {
-  // For each flight keep the cheapest and the fastest way to the airport.
-  const groups = new Map<string, Option[]>();
-  for (const o of list) {
-    const key = o.kind === "flight" ? `${o.gateway}-${o.carrier}` : o.id;
-    groups.set(key, [...(groups.get(key) ?? []), o]);
-  }
-  const out: Option[] = [];
-  for (const arr of groups.values()) {
-    const cheap = arr.reduce((a, b) => (b.totalEach < a.totalEach ? b : a));
-    const fast = arr.reduce((a, b) => (b.doorMins < a.doorMins ? b : a));
-    out.push(cheap);
-    if (fast !== cheap) out.push(fast);
-  }
-  return out;
+/** Google Flights search narrowed to one specific flight, so a group can find the exact same one. */
+export function googleExactFlight(flight: string, from: string, to: string, date: string): string {
+  return `https://www.google.com/travel/flights?q=${encodeURIComponent(`${flight} from ${from} to ${to} on ${date}`)}`;
 }
 
-export type SortMode = "best" | "cheapest" | "fastest" | "greenest";
-
-export function rank(options: Option[], mode: SortMode, moneyWeight: number): Option[] {
-  if (!options.length) return [];
-  const costs = options.map((o) => o.totalEach);
-  const times = options.map((o) => o.doorMins);
-  const [c0, c1, t0, t1] = [Math.min(...costs), Math.max(...costs), Math.min(...times), Math.max(...times)];
-  const norm = (v: number, a: number, b: number) => (b === a ? 0 : (v - a) / (b - a));
-  for (const o of options) {
-    const penalty = o.stops * 0.07 + (o.leaveBy < 5 * 60 ? 0.12 : 0) + o.transfers * 0.02;
-    o.score = Math.round(100 * (1 - (norm(o.totalEach, c0, c1) * moneyWeight + norm(o.doorMins, t0, t1) * (1 - moneyWeight) + penalty)));
-    o.badges = [];
-  }
-  const by: Record<SortMode, (a: Option, b: Option) => number> = {
-    best: (a, b) => b.score - a.score,
-    cheapest: (a, b) => a.totalEach - b.totalEach || a.doorMins - b.doorMins,
-    fastest: (a, b) => a.doorMins - b.doorMins || a.totalEach - b.totalEach,
-    greenest: (a, b) => a.co2 - b.co2,
-  };
-  const label: [SortMode, string][] = [["best", "Best"], ["cheapest", "Cheapest"], ["fastest", "Fastest"], ["greenest", "Greenest"]];
-  for (const [mode2, name] of label) {
-    const top = [...options].sort(by[mode2])[0];
-    if (top) top.badges.push(name);
-  }
-  return [...options].sort(by[mode]);
+/** Live flight status (Google shows it for a flight number search). */
+export function flightStatus(flight: string, date: string): string {
+  return `https://www.google.com/search?q=${encodeURIComponent(`${flight} flight status ${date}`)}`;
 }
 
-// Cheapest round trip door to door for a pair of dates.
-export function cheapest(dest: Destination, out: string, back: string, prefs: Prefs, bookedOn = todayISO()): number | null {
-  const list = search(dest, out, back, { ...prefs, window: "any" }, bookedOn);
-  return list.length ? Math.min(...list.map((o) => o.totalEach)) : null;
+/** Door-to-door directions from Old Campus. */
+export function directions(to: string, mode: "transit" | "driving" = "transit"): string {
+  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(OLD_CAMPUS)}&destination=${encodeURIComponent(to)}&travelmode=${mode}`;
 }
 
-export function calendar(dest: Destination, out: string, back: string, prefs: Prefs): { date: string; price: number | null }[] {
-  const stay = Math.max(1, daysBetween(out, back));
-  const today = todayISO();
-  const days: { date: string; price: number | null }[] = [];
-  for (let i = -5; i <= 6; i++) {
-    const d = addDays(out, i);
-    if (daysBetween(today, d) < 1) continue;
-    days.push({ date: d, price: cheapest(dest, d, addDays(d, stay), prefs) });
-  }
-  return days;
-}
-
-export type Advice = {
-  status: "now" | "good" | "wait" | "past";
-  headline: string;
-  bookBy: string | null;
-  now: number | null;
-  low: number | null;
-  lowOn: string | null;
-  curve: { day: number; price: number }[];
+export const GROUND_LINKS: Record<GroundRoute["kind"], { label: string; url: string }[]> = {
+  train: [
+    { label: "Amtrak", url: "https://www.amtrak.com/" },
+    { label: "Metro-North (TrainTime)", url: "https://new.mta.info/agency/metro-north-railroad" },
+  ],
+  bus: [
+    { label: "FlixBus", url: "https://www.flixbus.com/" },
+    { label: "Peter Pan", url: "https://peterpanbus.com/" },
+  ],
+  drive: [{ label: "Zipcar", url: "https://www.zipcar.com/" }],
+  ferry: [{ label: "Cross Sound Ferry", url: "https://www.longislandferry.com/" }],
 };
 
-export function advice(dest: Destination, out: string, back: string, prefs: Prefs): Advice {
-  const today = todayISO();
-  const daysOut = daysBetween(today, out);
-  const intl = !dest.domestic;
-  const [lo, hi] = intl ? [60, 150] : [21, 70];
-  const curve: { day: number; price: number }[] = [];
-  for (let d = -21; d <= Math.min(daysOut - 1, 90); d += 3) {
-    const p = cheapest(dest, out, back, prefs, addDays(today, d));
-    if (p) curve.push({ day: d, price: p });
-  }
-  const future = curve.filter((p) => p.day >= 0);
-  const now = future[0]?.price ?? null;
-  const lowPoint = future.reduce<{ day: number; price: number } | null>((m, p) => (!m || p.price < m.price ? p : m), null);
-  if (daysOut < 1) return { status: "past", headline: "That date has passed.", bookBy: null, now, low: null, lowOn: null, curve };
-  if (!dest.airport) {
-    return { status: "good", headline: "Trains and buses barely move in price. Book a week or two out.", bookBy: addDays(out, -10), now, low: lowPoint?.price ?? null, lowOn: null, curve };
-  }
-  if (daysOut < lo) {
-    return {
-      status: "now",
-      headline: daysOut < 14 ? "Book today. Fares jump about 20% in the last week." : "You're past the cheap window. Book in the next few days.",
-      bookBy: today, now, low: lowPoint?.price ?? null, lowOn: lowPoint ? addDays(today, lowPoint.day) : null, curve,
-    };
-  }
-  if (daysOut <= hi) {
-    return { status: "good", headline: "You're in the sweet spot. Fares are near their low.", bookBy: addDays(out, -lo), now, low: lowPoint?.price ?? null, lowOn: lowPoint ? addDays(today, lowPoint.day) : null, curve };
-  }
-  return { status: "wait", headline: "Early. Fares usually dip closer in, so set a fare alert.", bookBy: addDays(out, -hi), now, low: lowPoint?.price ?? null, lowOn: lowPoint ? addDays(today, lowPoint.day) : null, curve };
-}
-
-export function airportComparison(dest: Destination, out: string, back: string, prefs: Prefs) {
-  return GATEWAYS.map((gw) => {
-    const list = search(dest, out, back, { ...prefs, gateways: [gw.code], includeGround: false, window: "any" });
-    if (!list.length) return { gw, price: null as number | null, mins: null as number | null, hidden: prefs.boycottAvelo && gw.code === "HVN" };
-    return {
-      gw,
-      price: Math.min(...list.map((o) => o.totalEach)),
-      mins: Math.min(...list.map((o) => o.doorMins)),
-      hidden: false,
-    };
-  });
-}
-
-export function aveloCount(dest: Destination, out: string, back: string, prefs: Prefs): number {
-  return search(dest, out, back, { ...prefs, boycottAvelo: false }).filter((o) => o.carrier === "XP").length;
+/** Normalizes "b6 1503", "B61503", "jetblue 1503" style input to "B6 1503". Returns null if it doesn't look like a flight number. */
+export function normalizeFlight(raw: string): string | null {
+  const m = raw.trim().toUpperCase().replace(/\s+/g, " ").match(/^([A-Z0-9]{2})\s?(\d{1,4})$/);
+  return m ? `${m[1]} ${m[2]}` : null;
 }

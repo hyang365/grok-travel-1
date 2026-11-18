@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FindFlightsButton } from "./flights/FlightsView";
+import { FindFlightsButton, GroupFlightSummary } from "./flights/FlightsView";
 import { DIRECTORY, ME, PLACE_BY_ID, PLACES, SUGGESTED_NETIDS } from "./data";
 import {
   anonymousOverlap,
@@ -867,6 +867,7 @@ export function ItineraryView() {
                 <Rating value={scoreOf(place.id, "overall")} />
               </div>
               {trip.note ? <p>{trip.note}</p> : null}
+              <GroupFlightSummary trip={trip} />
               <p className="overlap-line">
                 <b>{overlap.count.toLocaleString("en-US")}</b> Yalies overlap these dates
                 {names.length ? `. With ${names.join(" and ")}` : ""}.

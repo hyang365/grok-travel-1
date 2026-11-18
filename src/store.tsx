@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useReducer, type Dispatc
 import { DIRECTORY, ME, PLACE_BY_ID } from "./data";
 import { useReviewStore } from "./reviews/store";
 import { passesFilters, sortScore, visitCount } from "./logic";
-import type { Filters, MapMode, Person, Place, Season, Scope, SortKey, ThemeName, Trip, ViewName } from "./types";
+import type { FlightLeg, GroupFlight, Filters, MapMode, Person, Place, Season, Scope, SortKey, ThemeName, Trip, ViewName } from "./types";
 
 export const DEFAULT_FILTERS: Filters = {
   overall: 1,
@@ -91,6 +91,29 @@ function sanitizeTrip(value: unknown): Trip | null {
     end: trip.end,
     note: typeof trip.note === "string" ? trip.note : "",
     friendNetids: Array.isArray(trip.friendNetids) ? trip.friendNetids.filter((id) => typeof id === "string") : [],
+    groupFlight: sanitizeGroupFlight(trip.groupFlight),
+  };
+}
+
+function sanitizeLeg(value: unknown): FlightLeg | null {
+  if (!value || typeof value !== "object") return null;
+  const leg = value as Partial<FlightLeg>;
+  if (typeof leg.flight !== "string" || typeof leg.date !== "string") return null;
+  return { flight: leg.flight, date: leg.date, time: String(leg.time ?? ""), from: String(leg.from ?? ""), to: String(leg.to ?? "") };
+}
+
+function sanitizeGroupFlight(value: unknown): GroupFlight | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const g = value as Partial<GroupFlight>;
+  const outbound = sanitizeLeg(g.outbound);
+  if (!outbound) return undefined;
+  return {
+    outbound,
+    ret: sanitizeLeg(g.ret),
+    link: typeof g.link === "string" ? g.link : "",
+    setBy: typeof g.setBy === "string" ? g.setBy : "",
+    booked: Array.isArray(g.booked) ? g.booked.filter((id) => typeof id === "string") : [],
+    setAt: typeof g.setAt === "string" ? g.setAt : "",
   };
 }
 
