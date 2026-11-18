@@ -8,6 +8,17 @@ https://hyang365.github.io/grok1/
 
 # TripTable
 
-Yale travel, the way CourseTable treats classes. The home page is a Mercator map of de-identified student trips. Open a country for ratings, stays, and how many Yalies overlap your dates. Inside the United States, the pins are the specific places: cities, and the smaller Atlas-style spots.
+**Yale travel, the way CourseTable treats classes.** See where Yalies go, plan with friends, and find the best way to get there from campus.
 
-Friend itineraries are opt-in. Everyone else is a count.
+## Features
+
+- **Map:** where Yalies travel each break, anonymized. Click a place for ratings, stays and reviews.
+- **Catalog and filters:** sort and filter by affordability, safety, beauty, continent and type of trip.
+- **Friends:** add by NetID to see their plans and overlapping dates. Everyone else is just a count.
+- **Yale travel rules:** flags countries Yale won't sponsor (State Dept Level 4) and blocks flights there.
+- **Flights:** door-to-door round-trip prices from Old Campus through Tweed, Bradley, JFK, LGA, Newark or Logan, plus trains and buses for nearby trips. Sort by Best, Cheapest, Fastest or Greenest.
+  - **Boycott Avelo** with one switch.
+  - **Fly with friends:** Uber costs split automatically.
+  - **When to book:** a book-now-or-wait tip, cheaper nearby dates, and which airport is cheapest.
+  - **Save** to your Itinerary, set **fare alerts**, and **Book** on Google Flights.
+- **Itinerary:** your trips, flights and friends in one place.
