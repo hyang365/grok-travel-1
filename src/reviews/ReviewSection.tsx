@@ -8,7 +8,7 @@ export const COLLEGES = [
   "Pauli Murray", "Pierson", "Saybrook", "Silliman", "Timothy Dwight", "Trumbull", "Ezra Stiles", "Graduate / Professional",
 ];
 
-const AUTHOR_KEY = "triptable-author";
+export const AUTHOR_KEY = "triptable-author";
 const YEARS = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
 
 const label = (k: string) => (k === "affordability" ? "Afford" : k[0].toUpperCase() + k.slice(1));

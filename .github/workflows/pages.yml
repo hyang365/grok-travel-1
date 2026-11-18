@@ -30,6 +30,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Build transit schedule lookup (non-fatal)
+        run: node scripts/build-transit.mjs
       - run: npx vite build
         env:
           GITHUB_PAGES: "true"

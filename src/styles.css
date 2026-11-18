@@ -656,3 +656,17 @@ legend { padding: 0 4px; font-size: 12px; }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
 }
+
+.theme-btn { width: 34px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--color-text-secondary); }
+.theme-btn:hover { background: var(--color-surface-hover); color: var(--color-text); }
+
+/* Phones: two-row top bar so the search box and menus don't get squeezed. */
+@media (max-width: 760px) {
+  .topbar { height: auto; flex-wrap: wrap; row-gap: 6px; padding: 8px 10px 6px; }
+  .topbar .search { order: 1; flex: 1 1 0; max-width: none; }
+  .topbar .season-wrap { order: 2; }
+  .topbar .pf-menu { order: 3; }
+  .topbar .nav { order: 4; flex: 1 0 100%; margin-left: 0; }
+  .season { max-width: 140px; }
+  .rail.open { inset: 96px auto 0 0; }
+}

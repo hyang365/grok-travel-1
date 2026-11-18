@@ -4,3 +4,4 @@ site
 .DS_Store
 *.local
 .vite
+public/transit-static.json

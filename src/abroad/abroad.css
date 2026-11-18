@@ -78,3 +78,5 @@
 .ab-tag { text-transform: none; }
 .panel .ab-rows button { padding: 8px 6px; }
 .workspace.no-rail { grid-template-columns: 1fr; }
+.map-mode button { white-space: nowrap; }
+@media (max-width: 520px) { .map-mode button { padding: 0 10px; font-size: 13px; } }

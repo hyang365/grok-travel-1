@@ -63,7 +63,8 @@ export type Scope = "all" | "countries" | "us";
 export type SortKey = "yalies" | "overall" | "affordability" | "safety" | "beauty";
 export type ThemeName = "light" | "dark";
 export type MapMode = "travel" | "abroad";
-export type ViewName = "map" | "catalog" | "friends" | "itinerary" | "flights" | "abroad";
+export type AbroadTerm = "Spring" | "Fall" | "Summer";
+export type ViewName = "map" | "catalog" | "friends" | "itinerary" | "flights" | "abroad" | "transit" | "profile";
 
 export type Filters = {
   overall: number;
@@ -105,3 +106,13 @@ export type Trip = {
   friendNetids: string[];
   groupFlight?: GroupFlight;
 };
+
+export type BucketItem = {
+  id: string;
+  kind: "place" | "program";
+  targetId: string;
+  addedAt: string;
+  done: boolean;
+};
+
+export type ProfileTab = "history" | "bucket" | "reviews" | "settings";

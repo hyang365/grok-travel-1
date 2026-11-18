@@ -3,6 +3,8 @@
 // (studyabroad.yale.edu/node/1241), checked Nov 2026. 2027 budgets post in Nov 2026.
 // Grants: funding.yale.edu, light.yale.edu, studyabroad.yale.edu, gilmanscholarship.org, borenawards.org.
 
+export type Region = "Europe" | "Latin America & Caribbean" | "Africa & Middle East" | "East Asia" | "South & Southeast Asia" | "Oceania";
+
 export type ProgramKind = "yss" | "london" | "nonyale-summer" | "term";
 
 export type Program = {
@@ -11,14 +13,18 @@ export type Program = {
   city: string;
   country: string;
   iso: string;
-  region: "Europe" | "Latin America" | "Africa & Middle East" | "East Asia" | "Southeast Asia";
+  region: Region;
   kind: ProgramKind;
   terms: string[];
   subject: string;
   language?: string;
   url: string;
   note?: string;
+  lat?: number;
+  lng?: number;
 };
+
+import { TERM_PROGRAMS } from "./termPrograms";
 
 const YSS = "https://studyabroad.yale.edu/programs/";
 
@@ -28,7 +34,7 @@ function yss(
   city: string,
   country: string,
   iso: string,
-  region: Program["region"],
+  region: Region,
   subject: string,
   language?: string,
   note?: string,
@@ -37,9 +43,9 @@ function yss(
 }
 
 export const PROGRAMS: Program[] = [
-  yss("yale-summer-session-rio-de-janeiro-immersive", "YSS in Rio de Janeiro: Immersive Portuguese I & II + Culture", "Rio de Janeiro", "Brazil", "BR", "Latin America", "Portuguese language and culture", "Portuguese"),
+  yss("yale-summer-session-rio-de-janeiro-immersive", "YSS in Rio de Janeiro: Immersive Portuguese I & II + Culture", "Rio de Janeiro", "Brazil", "BR", "Latin America & Caribbean", "Portuguese language and culture", "Portuguese"),
   yss("yale-summer-session-dubrovnik-history-culture", "YSS in Dubrovnik: History & Culture of Southeastern Europe", "Dubrovnik", "Croatia", "HR", "Europe", "History and culture"),
-  yss("yale-summer-session-quito-advanced-spanish", "YSS in Quito: Advanced Spanish Language and Andean Culture", "Quito", "Ecuador", "EC", "Latin America", "Spanish language and Andean culture", "Spanish"),
+  yss("yale-summer-session-quito-advanced-spanish", "YSS in Quito: Advanced Spanish Language and Andean Culture", "Quito", "Ecuador", "EC", "Latin America & Caribbean", "Spanish language and Andean culture", "Spanish"),
   yss("yale-summer-session-paris-intermediate-advanced", "YSS in Paris: Intermediate and Advanced French I & II", "Paris", "France", "FR", "Europe", "French language", "French"),
   yss("yale-summer-session-auvillar-personal", "YSS in Auvillar: Personal Geography", "Auvillar", "France", "FR", "Europe", "Creative nonfiction and place"),
   yss("yale-summer-session-batumi-russian-georgia", "YSS in Batumi: First-Year Russian I & II + Culture", "Batumi", "Georgia", "GE", "Europe", "Russian language and culture", "Russian"),
@@ -51,7 +57,7 @@ export const PROGRAMS: Program[] = [
   yss("yale-summer-session-siena-elementary-italian-i", "YSS in Siena: Elementary Italian I & II + Culture", "Siena", "Italy", "IT", "Europe", "Italian language and culture", "Italian"),
   yss("yale-summer-session-siena-intermediate-italian", "YSS in Siena: Intermediate Italian I & II + Culture", "Siena", "Italy", "IT", "Europe", "Italian language and culture", "Italian"),
   yss("yale-summer-session-ifrane-rabat-society", "YSS in Ifrane & Rabat: Society and Politics of North Africa", "Ifrane and Rabat", "Morocco", "MA", "Africa & Middle East", "Society and politics", undefined, "Runs in odd years only."),
-  yss("yale-summer-session-lima-advanced-spanish", "YSS in Lima: Advanced Spanish and Culture of Peru through Art", "Lima", "Peru", "PE", "Latin America", "Spanish language and art", "Spanish"),
+  yss("yale-summer-session-lima-advanced-spanish", "YSS in Lima: Advanced Spanish and Culture of Peru through Art", "Lima", "Peru", "PE", "Latin America & Caribbean", "Spanish language and art", "Spanish"),
   yss("yale-summer-session-barcelona-catalonia-modern", "YSS in Barcelona: Advanced Spanish", "Barcelona", "Spain", "ES", "Europe", "Spanish language", "Spanish"),
   yss("yale-summer-session-new-haven-bilbao", "YSS in Bilbao: Intermediate Spanish I & II + Culture", "Bilbao", "Spain", "ES", "Europe", "Spanish language and culture", "Spanish"),
   yss("yale-summer-session-valencia-language-culture", "YSS in Valencia: Language, Culture, and Society of Spain", "Valencia", "Spain", "ES", "Europe", "Spanish language and society", "Spanish"),
@@ -89,39 +95,14 @@ export const PROGRAMS: Program[] = [
     city: "Singapore",
     country: "Singapore",
     iso: "SG",
-    region: "Southeast Asia",
+    region: "South & Southeast Asia",
     kind: "nonyale-summer",
     terms: ["Summer"],
     subject: "Business, economics and Asian studies",
     url: "https://studyabroad.yale.edu/node/1400",
     note: "Apply directly or through CIEE. Up to two transfer credits per summer.",
   },
-  {
-    id: "ciee-taipei",
-    name: "CIEE in Taipei: Semester in Taipei",
-    city: "Taipei",
-    country: "Taiwan",
-    iso: "TW",
-    region: "East Asia",
-    kind: "term",
-    terms: ["Fall", "Spring", "Academic Year"],
-    subject: "Mandarin and East Asian studies",
-    language: "Chinese",
-    url: "https://studyabroad.yale.edu/node/1397",
-  },
-  {
-    id: "cet-taiwan",
-    name: "CET Taiwan",
-    city: "Taipei",
-    country: "Taiwan",
-    iso: "TW",
-    region: "East Asia",
-    kind: "term",
-    terms: ["Fall", "Spring", "Summer"],
-    subject: "Intensive Mandarin",
-    language: "Chinese",
-    url: "https://studyabroad.yale.edu/node/1458",
-  },
+  ...TERM_PROGRAMS,
 ];
 
 export const KIND_LABEL: Record<ProgramKind, string> = {
@@ -200,6 +181,22 @@ export const GRANTS: Record<string, Grant> = {
     deadline: "Spring 2027 cycle closes late Feb – early Mar 2027 (check the Gilman site)",
     url: "https://www.gilmanscholarship.org/applicants/deadlines-and-timeline/",
   },
+  provider: {
+    id: "provider",
+    name: "Program provider scholarships",
+    amount: "Varies",
+    who: "Most providers (CIEE, IES Abroad, SIT, CET, IFSA, DIS, SFS) run their own need- and merit-based scholarships, often due a term ahead.",
+    deadline: "Set by the provider. Check their site when you apply",
+    url: "",
+  },
+  swea: {
+    id: "swea",
+    name: "SWEA Boston Chapter Scholarship",
+    amount: "$12,000",
+    who: "Awarded each year to one or more students studying in Sweden, noted on Yale's DIS Stockholm page.",
+    deadline: "See the program page",
+    url: "https://studyabroad.yale.edu/programs/dis-stockholm",
+  },
   boren: {
     id: "boren",
     name: "Boren Scholarship",
@@ -212,7 +209,21 @@ export const GRANTS: Record<string, Grant> = {
 };
 
 const WESTERN_EUROPE = new Set(["FR", "DE", "IT", "ES", "SE", "GB"]);
-const SPANISH = new Set(["EC", "PE", "ES"]);
+const SPANISH = new Set(["AR", "CL", "CO", "CR", "CU", "DO", "EC", "ES", "MX", "PA", "PE"]);
+
+const PROVIDERS: { prefix: RegExp; name: string; url: string }[] = [
+  { prefix: /^CIEE\b/, name: "CIEE", url: "https://www.ciee.org/" },
+  { prefix: /^IES\b/, name: "IES Abroad", url: "https://www.iesabroad.org/" },
+  { prefix: /^SIT\b/, name: "SIT Study Abroad", url: "https://studyabroad.sit.edu/" },
+  { prefix: /^CET\b/, name: "CET Academic Programs", url: "https://cetacademicprograms.com/" },
+  { prefix: /^IFSA\b/, name: "IFSA", url: "https://www.ifsa-butler.org/" },
+  { prefix: /^DIS\b/, name: "DIS", url: "https://disabroad.org/" },
+  { prefix: /^School for Field Studies\b/, name: "The School for Field Studies", url: "https://fieldstudies.org/" },
+];
+
+export function providerOf(program: Program) {
+  return PROVIDERS.find((p) => p.prefix.test(program.name)) ?? null;
+}
 const EAST_ASIA = new Set(["CN", "JP", "KR", "TW"]);
 
 export function grantsFor(program: Program): Grant[] {
@@ -220,15 +231,21 @@ export function grantsFor(program: Program): Grant[] {
   if (program.kind === "yss" || program.kind === "london") ids.push("seg");
   if (program.kind === "london") ids.push("mellon");
   if (EAST_ASIA.has(program.iso)) ids.push("light");
-  if (program.region === "Latin America" && program.language) ids.push("oleary");
-  if (SPANISH.has(program.iso)) ids.push("class2004");
+  if (program.region === "Latin America & Caribbean" && program.language && program.kind !== "term") ids.push("oleary");
+  if (SPANISH.has(program.iso) && program.kind !== "term") ids.push("class2004");
   if (program.kind === "term" || program.terms.includes("Spring")) ids.push("finaid");
+  if (program.id === "dis-stockholm") ids.push("swea");
   ids.push("gilman");
   if (!WESTERN_EUROPE.has(program.iso) && program.language) ids.push("boren");
-  return ids.map((id) => GRANTS[id]);
+  const list = ids.map((id) => GRANTS[id]);
+  const provider = providerOf(program);
+  if (provider) {
+    list.splice(list.length - 1, 0, { ...GRANTS.provider, name: `${provider.name} scholarships`, url: provider.url });
+  }
+  return list;
 }
 
-export const REGIONS: Program["region"][] = ["Europe", "Latin America", "Africa & Middle East", "East Asia", "Southeast Asia"];
+export const REGIONS: Region[] = ["Europe", "Latin America & Caribbean", "Africa & Middle East", "East Asia", "South & Southeast Asia", "Oceania"];
 
 const CITY_COORDS: Record<string, [number, number]> = {
   "Rio de Janeiro": [-22.91, -43.17],
@@ -252,6 +269,7 @@ const CITY_COORDS: Record<string, [number, number]> = {
 };
 
 export function coordsOf(program: Program): [number, number] | null {
+  if (typeof program.lat === "number" && typeof program.lng === "number") return [program.lat, program.lng];
   return CITY_COORDS[program.city] ?? null;
 }
 
@@ -270,8 +288,16 @@ export const ABROAD_CITIES: AbroadCity[] = (() => {
   return [...map.values()];
 })();
 
-export function programsIn(iso: string): Program[] {
-  return PROGRAMS.filter((p) => p.iso === iso);
+/** Whether a program runs in the given term. Full-year programs count for both semesters. */
+export function offeredIn(program: Program, term: "Spring" | "Fall" | "Summer"): boolean {
+  if (program.terms.includes(term)) return true;
+  return term !== "Summer" && program.terms.includes("Academic Year");
 }
 
-export const MAX_PROGRAMS_PER_COUNTRY = Math.max(1, ...[...new Set(PROGRAMS.map((p) => p.iso))].map((iso) => programsIn(iso).length));
+export function programsIn(iso: string, term?: "Spring" | "Fall" | "Summer"): Program[] {
+  return PROGRAMS.filter((p) => p.iso === iso && (!term || offeredIn(p, term)));
+}
+
+export function maxPerCountry(term: "Spring" | "Fall" | "Summer"): number {
+  return Math.max(1, ...[...new Set(PROGRAMS.map((p) => p.iso))].map((iso) => programsIn(iso, term).length));
+}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DIRECTORY, ME, PLACE_BY_ID, PLACES } from "../data";
 import { formatMoney, formatRange, travelGuidance } from "../logic";
 import { useFriends, useTripTable } from "../store";
@@ -23,6 +23,7 @@ import {
 } from "./engine";
 import { ALL_GATEWAYS, flightStore, useFlights } from "./flightStore";
 import "./flights.css";
+import { NextTrains } from "../transit/TransitView";
 
 const SEARCHABLE = PLACES.filter((p) => p.id !== "us");
 
@@ -138,7 +139,6 @@ function fastest(gw: Gateway) {
 // ---------- main view ----------
 export function FlightsView() {
   const { state } = useTripTable();
-  const friends = useFriends();
   const fs = useFlights();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -256,23 +256,7 @@ export function FlightsView() {
       </section>
 
       <section className="fl-toolbar">
-        <div className="fl-crew">
-          <span className="field-label">Flying with</span>
-          {friends.length ? (
-            friends.map((f) => (
-              <button
-                key={f.netid}
-                type="button"
-                className={fs.crew.includes(f.netid) ? "fl-chip on" : "fl-chip"}
-                onClick={() => flightStore.set((s) => ({ crew: s.crew.includes(f.netid) ? s.crew.filter((x) => x !== f.netid) : [...s.crew, f.netid] }))}
-              >
-                {f.name.split(" ")[0]}
-              </button>
-            ))
-          ) : (
-            <span className="fl-muted">Add friends to split rides</span>
-          )}
-        </div>
+        <CrewPicker />
         <div className="fl-crew">
           <span className="field-label">Airports</span>
           {GATEWAYS.map((g) => {
@@ -330,6 +314,7 @@ export function FlightsView() {
             ) : null}
 
             {dest.groundRoutes.length ? <GroundCards dest={dest} crewSize={crewSize} /> : null}
+            {dest.groundRoutes.length || gateways.some((g) => g.code !== "HVN" && g.code !== "BDL") ? <NextTrains /> : null}
 
             {dest.airport ? (
               <>
@@ -373,6 +358,65 @@ export function FlightsView() {
 }
 
 // ---------- pieces ----------
+/** "Flying with" as a compact dropdown checklist of your friends. */
+function CrewPicker() {
+  const friends = useFriends();
+  const fs = useFlights();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  const chosen = friends.filter((f) => fs.crew.includes(f.netid));
+  const label = chosen.length === 0 ? "Just me" : chosen.length <= 2 ? chosen.map((f) => f.name.split(" ")[0]).join(", ") : `${chosen.length} friends`;
+  return (
+    <div className="fl-crewpick" ref={ref}>
+      <button type="button" className={open ? "fl-ghost on" : "fl-ghost"} aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <span className="fl-muted">Flying with:</span> {label} ▾
+      </button>
+      {open ? (
+        <div className="fl-crewmenu" role="menu">
+          {friends.length === 0 ? (
+            <p className="fl-muted fl-small">Add friends on the Friends tab to split rides and plan flights together.</p>
+          ) : (
+            <>
+              {friends.map((f) => (
+                <label key={f.netid} className="check fl-crewitem">
+                  <input
+                    type="checkbox"
+                    checked={fs.crew.includes(f.netid)}
+                    onChange={() => flightStore.set((s) => ({ crew: s.crew.includes(f.netid) ? s.crew.filter((x) => x !== f.netid) : [...s.crew, f.netid] }))}
+                  />
+                  <span>{f.name}</span>
+                  <span className="fl-muted fl-small">{f.college}</span>
+                </label>
+              ))}
+              <div className="fl-crewfoot">
+                <button type="button" className="textlink" onClick={() => flightStore.set({ crew: friends.map((f) => f.netid) })}>
+                  Everyone
+                </button>
+                <button type="button" className="textlink" onClick={() => flightStore.set({ crew: [] })}>
+                  Clear
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function GatewayCard({ gw, dest, out, back, crewSize }: { gw: Gateway; dest: Destination; out: string; back: string; crewSize: number }) {
   const to = dest.airport?.code ?? "";
   const quick = fastest(gw);

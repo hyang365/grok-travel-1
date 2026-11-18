@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useReducer, type Dispatc
 import { DIRECTORY, ME, PLACE_BY_ID } from "./data";
 import { useReviewStore } from "./reviews/store";
 import { passesFilters, sortScore, visitCount } from "./logic";
-import type { FlightLeg, GroupFlight, Filters, MapMode, Person, Place, Season, Scope, SortKey, ThemeName, Trip, ViewName } from "./types";
+import type { AbroadTerm, BucketItem, ProfileTab, FlightLeg, GroupFlight, Filters, MapMode, Person, Place, Season, Scope, SortKey, ThemeName, Trip, ViewName } from "./types";
 
 export const DEFAULT_FILTERS: Filters = {
   overall: 1,
@@ -34,6 +34,9 @@ export type State = {
   toast: string | null;
   homeTick: number;
   mapMode: MapMode;
+  abroadTerm: AbroadTerm;
+  bucket: BucketItem[];
+  profileTab: ProfileTab;
   abroadIso: string | null;
   abroadProgramId: string | null;
 };
@@ -41,7 +44,7 @@ export type State = {
 const SEASONS = new Set<Season>(["spring", "summer", "fall", "winter", "weekend"]);
 const SORTS = new Set<SortKey>(["yalies", "overall", "affordability", "safety", "beauty"]);
 const SCOPES = new Set<Scope>(["all", "countries", "us"]);
-const VIEWS = new Set<ViewName>(["map", "catalog", "friends", "itinerary", "flights", "abroad"]);
+const VIEWS = new Set<ViewName>(["map", "catalog", "friends", "itinerary", "flights", "abroad", "transit", "profile"]);
 const FEATURE_IDS = new Set(["beach", "mountain", "city", "island", "desert", "food"]);
 const CONTINENT_NAMES = new Set(["North America", "Caribbean", "Central America", "South America", "Europe", "Africa", "Asia", "Oceania"]);
 
@@ -72,6 +75,9 @@ function defaultState(): State {
     toast: null,
     homeTick: 0,
     mapMode: "travel",
+    abroadTerm: "Fall",
+    bucket: [],
+    profileTab: "history",
     abroadIso: null,
     abroadProgramId: null,
   };
@@ -147,6 +153,11 @@ function loadState(): State {
       emptyGeo: null,
       homeTick: 0,
       mapMode: data.mapMode === "abroad" ? "abroad" : "travel",
+      abroadTerm: data.abroadTerm === "Spring" || data.abroadTerm === "Summer" ? data.abroadTerm : "Fall",
+      bucket: Array.isArray(data.bucket)
+        ? data.bucket.filter((b): b is BucketItem => Boolean(b && typeof b.targetId === "string" && (b.kind === "place" || b.kind === "program")))
+        : [],
+      profileTab: data.profileTab && ["history", "bucket", "reviews", "settings"].includes(data.profileTab) ? data.profileTab : "history",
       abroadIso: null,
       abroadProgramId: typeof data.abroadProgramId === "string" ? data.abroadProgramId : null,
     };
@@ -175,6 +186,10 @@ export type Action =
   | { type: "reset" }
   | { type: "setMapMode"; mode: MapMode }
   | { type: "selectAbroad"; iso: string | null }
+  | { type: "setAbroadTerm"; term: AbroadTerm }
+  | { type: "toggleBucket"; kind: BucketItem["kind"]; targetId: string; label?: string }
+  | { type: "setBucketDone"; id: string; done: boolean }
+  | { type: "openProfile"; tab: ProfileTab }
   | { type: "openProgram"; id: string };
 
 function reducer(state: State, action: Action): State {
@@ -228,7 +243,8 @@ function reducer(state: State, action: Action): State {
     case "focusFriend":
       return { ...state, friendFocus: action.netid, view: "friends" };
     case "saveTrip": {
-      const index = state.trips.findIndex((trip) => trip.placeId === action.trip.placeId);
+      // Match by id, so a past trip and an upcoming trip to the same place can coexist.
+      const index = state.trips.findIndex((trip) => trip.id === action.trip.id);
       const trips = index === -1 ? [...state.trips, action.trip] : state.trips.map((trip, i) => (i === index ? action.trip : trip));
       return { ...state, trips, toast: action.message ?? "Saved to itinerary" };
     }
@@ -240,6 +256,18 @@ function reducer(state: State, action: Action): State {
       return { ...state, toast: null };
     case "setMapMode":
       return { ...state, mapMode: action.mode, view: "map", abroadIso: null, selectedId: null, emptyGeo: null };
+    case "toggleBucket": {
+      const existing = state.bucket.find((b) => b.kind === action.kind && b.targetId === action.targetId);
+      if (existing) return { ...state, bucket: state.bucket.filter((b) => b !== existing), toast: "Removed from your bucket list" };
+      const item: BucketItem = { id: `b-${action.kind}-${action.targetId}`, kind: action.kind, targetId: action.targetId, addedAt: new Date().toISOString(), done: false };
+      return { ...state, bucket: [item, ...state.bucket], toast: `${action.label ?? "Added"} added to your bucket list` };
+    }
+    case "setBucketDone":
+      return { ...state, bucket: state.bucket.map((b) => (b.id === action.id ? { ...b, done: action.done } : b)) };
+    case "openProfile":
+      return { ...state, view: "profile", profileTab: action.tab };
+    case "setAbroadTerm":
+      return { ...state, abroadTerm: action.term };
     case "selectAbroad":
       return { ...state, abroadIso: action.iso, selectedId: null, emptyGeo: null };
     case "openProgram":

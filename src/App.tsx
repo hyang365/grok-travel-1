@@ -9,6 +9,10 @@ import { AveloToggle, FlightsView } from "./flights/FlightsView";
 import { LOGO } from "./logo";
 import { AbroadView } from "./abroad/AbroadView";
 import { AbroadMapPanel } from "./abroad/AbroadMapPanel";
+import { TransitView } from "./transit/TransitView";
+import { ProfileMenu } from "./profile/ProfileMenu";
+import { ProfileView } from "./profile/ProfileView";
+import { isUpcoming } from "./profile/trips";
 import "./abroad/abroad.css";
 
 function Shell() {
@@ -77,19 +81,37 @@ function Shell() {
           }}
         />
         <label className="season-wrap">
-          <span className="sr">Season</span>
-          <select
-            className="season"
-            aria-label="Season"
-            value={state.season}
-            onChange={(event) => dispatch({ type: "setSeason", season: event.target.value as typeof state.season })}
-          >
-            <option value="spring">Spring Break</option>
-            <option value="summer">Summer</option>
-            <option value="fall">Fall Break</option>
-            <option value="winter">Winter</option>
-            <option value="weekend">Weekends</option>
-          </select>
+          {abroadMap && state.view === "map" ? (
+            <>
+              <span className="sr">Term</span>
+              <select
+                className="season"
+                aria-label="Study abroad term"
+                value={state.abroadTerm}
+                onChange={(event) => dispatch({ type: "setAbroadTerm", term: event.target.value as typeof state.abroadTerm })}
+              >
+                <option value="Fall">Fall semester</option>
+                <option value="Spring">Spring semester</option>
+                <option value="Summer">Summer</option>
+              </select>
+            </>
+          ) : (
+            <>
+              <span className="sr">Season</span>
+              <select
+                className="season"
+                aria-label="Season"
+                value={state.season}
+                onChange={(event) => dispatch({ type: "setSeason", season: event.target.value as typeof state.season })}
+              >
+                <option value="spring">Spring Break</option>
+                <option value="summer">Summer</option>
+                <option value="fall">Fall Break</option>
+                <option value="winter">Winter</option>
+                <option value="weekend">Weekends</option>
+              </select>
+            </>
+          )}
         </label>
         <nav className="nav">
           <button className="filters-toggle" type="button" onClick={() => setRailOpen((open) => !open)}>
@@ -107,6 +129,9 @@ function Shell() {
           <button className={state.view === "abroad" ? "nav-btn active" : "nav-btn"} type="button" onClick={() => dispatch({ type: "setView", view: "abroad" })}>
             Study Abroad
           </button>
+          <button className={state.view === "transit" ? "nav-btn active" : "nav-btn"} type="button" onClick={() => dispatch({ type: "setView", view: "transit" })}>
+            Transit
+          </button>
           <button
             className={state.view === "friends" ? "nav-btn active" : "nav-btn"}
             type="button"
@@ -120,17 +145,31 @@ function Shell() {
             onClick={() => dispatch({ type: "setView", view: "itinerary" })}
           >
             Itinerary
-            <span className="badge">{state.trips.length}</span>
+            <span className="badge">{state.trips.filter(isUpcoming).length}</span>
           </button>
           <AveloToggle />
           <button
-            className="nav-btn"
+            className="nav-btn theme-btn"
             type="button"
+            aria-label={state.theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+            title={state.theme === "light" ? "Dark mode" : "Light mode"}
             onClick={() => dispatch({ type: "setTheme", theme: state.theme === "light" ? "dark" : "light" })}
           >
-            {state.theme === "light" ? "Dark" : "Light"}
+            {state.theme === "light" ? (
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z" fill="currentColor" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <circle cx="12" cy="12" r="4.5" fill="currentColor" />
+                <g stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" />
+                </g>
+              </svg>
+            )}
           </button>
         </nav>
+        <ProfileMenu />
       </header>
 
       {state.view === "map" ? (
@@ -148,13 +187,13 @@ function Shell() {
             </div>
             {abroadMap ? (
               <div className="legend">
-                <div className="legend-title">Study abroad programs</div>
+                <div className="legend-title">{state.abroadTerm === "Summer" ? "Summer" : `${state.abroadTerm} semester`} programs</div>
                 <div className="legend-scale">
                   <span>1</span>
                   <i className="legend-bar" />
                   <span>More</span>
                 </div>
-                <div className="legend-total">Yale Summer Session, Yale in London and approved programs</div>
+                <div className="legend-total">Yale-run and Yale-approved programs offered this term</div>
               </div>
             ) : (
               <div className="legend">
@@ -196,6 +235,8 @@ function Shell() {
       ) : null}
       {state.view === "flights" ? <FlightsView /> : null}
       {state.view === "abroad" ? <AbroadView /> : null}
+      {state.view === "transit" ? <TransitView /> : null}
+      {state.view === "profile" ? <ProfileView /> : null}
       {state.view === "friends" ? <FriendsView /> : null}
       {state.view === "itinerary" ? <ItineraryView /> : null}
       {state.toast ? (

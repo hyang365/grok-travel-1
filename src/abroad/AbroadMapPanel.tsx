@@ -3,11 +3,25 @@ import { useTripTable } from "../store";
 import { KIND_LABEL, grantsFor, programsIn } from "./data";
 
 export function AbroadMapPanel({ iso }: { iso: string }) {
-  const { dispatch } = useTripTable();
+  const { state, dispatch } = useTripTable();
   const { reviews } = useReviewStore();
-  const programs = programsIn(iso);
-  if (!programs.length) return null;
-  const country = programs[0].country;
+  const term = state.abroadTerm;
+  const programs = programsIn(iso, term);
+  const termLabel = term === "Summer" ? "Summer" : `${term} semester`;
+  if (!programs.length) {
+    return (
+      <aside className="panel">
+        <div className="panel-scroll">
+          <div className="panel-head">
+            <h2>{programsIn(iso)[0]?.country ?? "No programs"}</h2>
+            <button className="icon-btn" type="button" aria-label="Close" onClick={() => dispatch({ type: "selectAbroad", iso: null })}>×</button>
+          </div>
+          <p className="fl-muted">No Yale-approved programs here for {termLabel.toLowerCase()}. Try another term at the top.</p>
+        </div>
+      </aside>
+    );
+  }
+  const country = programs.find((p) => p.country !== "Multiple countries")?.country ?? programs[0].country;
   const grantNames = [...new Map(programs.flatMap(grantsFor).map((g) => [g.id, g])).values()];
 
   return (
@@ -15,7 +29,7 @@ export function AbroadMapPanel({ iso }: { iso: string }) {
       <div className="panel-scroll">
         <div className="panel-head">
           <div>
-            <p className="kicker">Study abroad · {programs.length} {programs.length === 1 ? "program" : "programs"}</p>
+            <p className="kicker">{termLabel} · {programs.length} {programs.length === 1 ? "program" : "programs"}</p>
             <h2 id="abroad-title">{country}</h2>
           </div>
           <button className="icon-btn" type="button" aria-label="Close" onClick={() => dispatch({ type: "selectAbroad", iso: null })}>

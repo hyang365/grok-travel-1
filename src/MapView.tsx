@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { COUNTRY_BY_ISO, PLACE_BY_ID, PLACES } from "./data";
 import { heatColor, seasonLabel, visitCount } from "./logic";
 import { useCatalog, useFriends, useTripTable } from "./store";
-import { ABROAD_CITIES, MAX_PROGRAMS_PER_COUNTRY, programsIn } from "./abroad/data";
+import { ABROAD_CITIES, maxPerCountry, offeredIn, programsIn } from "./abroad/data";
 
 type PointDatum = {
   latitude: number;
@@ -53,6 +53,8 @@ export function MapView() {
   const abroad = state.mapMode === "abroad";
   const modeRef = useRef(state.mapMode);
   modeRef.current = state.mapMode;
+  const abroadTermRef = useRef(state.abroadTerm);
+  abroadTermRef.current = state.abroadTerm;
   const panelOpen = abroad ? Boolean(state.abroadIso) : Boolean(state.selectedId || state.emptyGeo);
   const selected = state.selectedId ? PLACE_BY_ID.get(state.selectedId) : undefined;
 
@@ -63,26 +65,35 @@ export function MapView() {
     const seasonName = seasonLabel(state.season);
     api.background.set("fill", am5.color(dark ? 0x121820 : 0xe8f1fb));
     if (abroad) {
+      const term = state.abroadTerm;
+      const maxN = maxPerCountry(term);
+      const termLabel = term === "Summer" ? "summer" : `${term.toLowerCase()} semester`;
       api.polygons.mapPolygons.each((polygon) => {
         const ctx = polygon.dataItem?.dataContext as { id?: string; name?: string } | undefined;
-        const n = ctx?.id ? programsIn(ctx.id).length : 0;
+        const n = ctx?.id ? programsIn(ctx.id, term).length : 0;
         const isSelected = Boolean(ctx?.id && ctx.id === state.abroadIso);
-        polygon.set("fill", am5.color(n ? heatColor(n, MAX_PROGRAMS_PER_COUNTRY, dark) : dark ? 0x2a2a2a : 0xf3f3f3));
+        polygon.set("fill", am5.color(n ? heatColor(n, maxN, dark) : dark ? 0x2a2a2a : 0xf3f3f3));
         polygon.set("stroke", am5.color(isSelected ? (dark ? 0xffffff : 0x141414) : dark ? 0x1a1a1a : 0xffffff));
         polygon.set("strokeWidth", isSelected ? 1.8 : 0.55);
-        polygon.set("tooltipText", n ? `${ctx?.name ?? ""}\n${n} study abroad ${n === 1 ? "program" : "programs"}` : (ctx?.name ?? ""));
+        polygon.set("tooltipText", n ? `${ctx?.name ?? ""}\n${n} ${termLabel} ${n === 1 ? "program" : "programs"}` : (ctx?.name ?? ""));
       });
-      api.spots.data.setAll(
-        ABROAD_CITIES.map((city) => ({
+      const spots: PointDatum[] = [];
+      for (const city of ABROAD_CITIES) {
+        const progs = city.programs.filter((p) => offeredIn(p, term));
+        if (!progs.length) continue;
+        const names = progs.slice(0, 6).map((p) => p.name);
+        if (progs.length > 6) names.push(`+${progs.length - 6} more`);
+        spots.push({
           latitude: city.lat,
           longitude: city.lng,
           placeId: "",
           iso: city.iso,
-          tooltip: `${city.city}\n${city.programs.map((p) => p.name).join("\n")}`,
-          radius: (city.iso === state.abroadIso ? 7 : 5) + Math.min(5, city.programs.length),
+          tooltip: `${city.city}\n${names.join("\n")}`,
+          radius: (city.iso === state.abroadIso ? 7 : 4) + Math.min(5, progs.length),
           fill: 0x0b3d91,
-        })),
-      );
+        });
+      }
+      api.spots.data.setAll(spots);
       api.pals.data.setAll([]);
       return;
     }
@@ -238,7 +249,7 @@ export function MapView() {
       const ctx = event.target.dataItem?.dataContext as { id?: string; name?: string } | undefined;
       if (!ctx?.id) return;
       if (modeRef.current === "abroad") {
-        dispatch({ type: "selectAbroad", iso: programsIn(ctx.id).length ? ctx.id : null });
+        dispatch({ type: "selectAbroad", iso: programsIn(ctx.id, abroadTermRef.current).length ? ctx.id : null });
         return;
       }
       const country = COUNTRY_BY_ISO.get(ctx.id);
@@ -300,7 +311,7 @@ export function MapView() {
 
   useEffect(() => {
     paintRef.current();
-  }, [state.theme, state.season, state.filters, state.showFriends, state.friendNetids, state.selectedId, state.mapMode, state.abroadIso, passed, friends, maxCountry]);
+  }, [state.theme, state.season, state.filters, state.showFriends, state.friendNetids, state.selectedId, state.mapMode, state.abroadIso, state.abroadTerm, passed, friends, maxCountry]);
 
   useEffect(() => {
     zoomRef.current();

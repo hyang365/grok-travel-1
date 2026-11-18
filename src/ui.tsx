@@ -23,6 +23,8 @@ import { DEFAULT_FILTERS, useCatalog, useFriends, useTripTable } from "./store";
 import type { Place, Season, SortKey } from "./types";
 import { ReviewSection } from "./reviews/ReviewSection";
 import { PLACE_KEYS, useReviewStore } from "./reviews/store";
+import { BucketButton } from "./profile/ProfileMenu";
+import { isPast, isUpcoming } from "./profile/trips";
 
 export function Rating({ value }: { value: number | null }) {
   if (value === null) return <span className="rate none" title="No reviews yet">—</span>;
@@ -264,6 +266,7 @@ export function PlacePanel({ place }: { place: Place }) {
         </div>
         <p className="blurb">{place.blurb}</p>
         <FindFlightsButton placeId={place.id} />
+        <BucketButton kind="place" targetId={place.id} label={place.name} />
         <GuidanceNote iso={place.iso} />
         <p className="fine">{continentsOf(place).join(" and ")}</p>
         <ul className="tags">
@@ -835,21 +838,28 @@ export function FriendsView() {
 export function ItineraryView() {
   const { state, dispatch } = useTripTable();
   useReviewStore();
+  const upcoming = state.trips.filter(isUpcoming).sort((a, b) => a.start.localeCompare(b.start));
+  const pastCount = state.trips.filter(isPast).length;
   const friends = useFriends();
   return (
     <div className="itinerary">
       <header>
         <div>
           <h2>Itinerary</h2>
-          <p>Your trips, with the anonymized overlap beside the friends who are actually on them.</p>
+          <p>Your upcoming trips, with the overlap beside the friends who are actually on them.</p>
         </div>
         <button className="textlink" type="button" onClick={() => dispatch({ type: "reset" })}>
           Reset demo data
         </button>
       </header>
-      {state.trips.length === 0 ? <p className="empty">Nothing saved. Add a place from the map.</p> : null}
+      {upcoming.length === 0 ? <p className="empty">No upcoming trips. Add a place from the map.</p> : null}
+      {pastCount ? (
+        <button type="button" className="textlink" onClick={() => dispatch({ type: "openProfile", tab: "history" })}>
+          {pastCount} past {pastCount === 1 ? "trip" : "trips"} in your trip history →
+        </button>
+      ) : null}
       <ul className="cards">
-        {state.trips.map((trip) => {
+        {upcoming.map((trip) => {
           const place = PLACE_BY_ID.get(trip.placeId);
           if (!place) return null;
           const overlap = anonymousOverlap(place, trip.season, trip);

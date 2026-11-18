@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useTripTable } from "../store";
 import { GRANTS, KIND_LABEL, PROGRAMS, REGIONS, grantsFor, type Program, type ProgramKind } from "./data";
 import { ReviewSection } from "../reviews/ReviewSection";
+import { BucketButton } from "../profile/ProfileMenu";
 import { PROGRAM_KEYS, averageOf, reviewsFor, useReviewStore, type Review } from "../reviews/store";
 import "./abroad.css";
 
@@ -103,6 +104,7 @@ function ProgramDetail({ program, reviews }: { program: Program; reviews: Review
           <button className="textlink" type="button" onClick={() => { dispatch({ type: "setMapMode", mode: "abroad" }); dispatch({ type: "selectAbroad", iso: program.iso }); }}>
             See on map
           </button>
+          <BucketButton kind="program" targetId={program.id} label={program.name} />
         </div>
       </header>
 
