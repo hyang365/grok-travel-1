@@ -3,6 +3,12 @@
 .rv-scores > div { border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; }
 .rv-score { font-weight: 650; font-size: 16px; }
 .rv-score.none { color: var(--color-text-tertiary); font-weight: 400; }
+.rv-skeleton { display: flex; flex-direction: column; gap: 8px; }
+.rv-skeleton div { height: 48px; border-radius: 8px; background: var(--color-surface-contrast); animation: rv-pulse 1.2s ease-in-out infinite; }
+.rv-skeleton div:nth-child(2) { animation-delay: 0.15s; }
+.rv-skeleton div:nth-child(3) { width: 72%; animation-delay: 0.3s; }
+@keyframes rv-pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .rv-skeleton div { animation: none; } }
 .rv-list { display: flex; flex-direction: column; gap: 8px; }
 .rv-list li { border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
 .rv-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }

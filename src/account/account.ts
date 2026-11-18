@@ -2,7 +2,7 @@
 // Signed out you are a guest: nothing loads and nothing is shared.
 
 import { useSyncExternalStore } from "react";
-import { supabase } from "../reviews/backend";
+import { googleProfileOf, supabase, yaleEmailOf } from "../reviews/backend";
 import { reviews } from "../reviews/store";
 import type { Person, PersonTrip, Season } from "../types";
 
@@ -41,6 +41,38 @@ function toPerson(p: Profile, trips: PersonTrip[]): Person {
   return { netid: p.id, name: displayName(p), college: p.college || "Yale", year: p.class_year || "", trips };
 }
 
+const accountErrorShown = new Set<string>();
+
+/** Insert the signed-in student's profiles row when this is their first sign-in. */
+async function ensureProfile(uid: string): Promise<Profile | null> {
+  if (!supabase) return null;
+  const { data: existing, error: readError } = await supabase.from("profiles").select("*").eq("id", uid).maybeSingle();
+  if (readError) return null;
+  if (existing) return existing as Profile;
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const user = userError ? null : userData.user;
+  const email = yaleEmailOf(user) || reviews.get().session?.email || "";
+  if (!email) return null;
+  const seed = googleProfileOf(user);
+  const { error: writeError } = await supabase.from("profiles").upsert(
+    { id: uid, email, full_name: seed.full_name, avatar_url: seed.avatar_url, college: "", class_year: "" },
+    { onConflict: "id", ignoreDuplicates: true },
+  );
+  const { data: created, error: againError } = await supabase.from("profiles").select("*").eq("id", uid).maybeSingle();
+  if (created) return created as Profile;
+  if ((writeError || againError) && !accountErrorShown.has(uid)) {
+    accountErrorShown.add(uid);
+    const blocked = writeError?.code === "42501" || againError?.code === "42501";
+    reviews.setAuthError(
+      blocked
+        ? "You're signed in with Yale, but the database refused to create your TripTable account."
+        : "You're signed in with Yale, but TripTable couldn't save your account. Refresh and try again.",
+    );
+  }
+  return null;
+}
+
 async function load() {
   if (!supabase || !currentUser) {
     emit({ me: null, friends: [], requests: [], loading: false });
@@ -48,19 +80,32 @@ async function load() {
   }
   emit({ loading: true });
   const uid = currentUser;
-  const [{ data: meRow }, { data: links }] = await Promise.all([
+  const [{ data: meRow, error: meError }, { data: links, error: linkError }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
     supabase.from("friendships").select("id,requester,addressee,status"),
   ]);
+  // A failed read must not replace the current friends list with an empty one.
+  if (meError || linkError) {
+    emit({ loading: false });
+    return;
+  }
   const rows = (links ?? []) as { id: string; requester: string; addressee: string; status: string }[];
   const otherIds = [...new Set(rows.map((r) => (r.requester === uid ? r.addressee : r.requester)))];
-  const { data: others } = otherIds.length ? await supabase.from("profiles").select("*").in("id", otherIds) : { data: [] };
+  const { data: others, error: othersError } = otherIds.length ? await supabase.from("profiles").select("*").in("id", otherIds) : { data: [], error: null };
+  if (othersError) {
+    emit({ loading: false });
+    return;
+  }
   const byId = new Map(((others ?? []) as Profile[]).map((p) => [p.id, p]));
 
   const acceptedIds = rows.filter((r) => r.status === "accepted").map((r) => (r.requester === uid ? r.addressee : r.requester));
-  const { data: tripRows } = acceptedIds.length
+  const { data: tripRows, error: tripError } = acceptedIds.length
     ? await supabase.from("trips").select("user_id,place_id,season,start_date,end_date").in("user_id", acceptedIds)
-    : { data: [] };
+    : { data: [], error: null };
+  if (tripError) {
+    emit({ loading: false });
+    return;
+  }
   const tripsBy = new Map<string, PersonTrip[]>();
   for (const t of (tripRows ?? []) as { user_id: string; place_id: string; season: Season; start_date: string; end_date: string }[]) {
     tripsBy.set(t.user_id, [...(tripsBy.get(t.user_id) ?? []), { placeId: t.place_id, season: t.season, start: t.start_date, end: t.end_date }]);
@@ -77,12 +122,7 @@ async function load() {
     .filter((r): r is Request => r !== null);
 
   let me = (meRow as Profile | null) ?? null;
-  if (!me) {
-    // Profiles are created by a database trigger on sign-up; this covers accounts made before it existed.
-    const session = reviews.get().session;
-    const { data } = await supabase.from("profiles").select("*").eq("id", uid).maybeSingle();
-    me = (data as Profile | null) ?? (session ? { id: uid, email: session.email, full_name: "", avatar_url: null, college: "", class_year: "" } : null);
-  }
+  if (!me) me = await ensureProfile(uid);
   emit({ me, friends, requests, loading: false });
 }
 
@@ -114,6 +154,8 @@ export const account = {
 
   async updateProfile(patch: Partial<Pick<Profile, "full_name" | "college" | "class_year">>): Promise<string | null> {
     if (!supabase || !currentUser) return "Sign in first.";
+    const existing = await ensureProfile(currentUser);
+    if (!existing) return "Couldn't create your TripTable account.";
     const { error } = await supabase.from("profiles").update(patch).eq("id", currentUser);
     if (error) return error.message;
     await load();

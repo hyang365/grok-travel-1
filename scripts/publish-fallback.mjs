@@ -9,7 +9,7 @@ rmSync("published/parts", { recursive: true, force: true });
 mkdirSync("published/parts", { recursive: true });
 const parts = [];
 for (let i = 0, n = 0; i < app.length; n += 1) {
-  let end = Math.min(app.length, i + 90000);
+  let end = Math.min(app.length, i + 60000);
   const code = app.charCodeAt(end - 1);
   if (code >= 0xd800 && code <= 0xdbff) end -= 1; // don't split a surrogate pair
   const name = `parts/${String(n).padStart(2, "0")}.js`;
@@ -19,7 +19,7 @@ for (let i = 0, n = 0; i < app.length; n += 1) {
 }
 for (const old of readdirSync("assets")) if (old.startsWith("style-")) rmSync(`assets/${old}`);
 copyFileSync(`site/assets/${css}`, `assets/${css}`);
-writeFileSync("published/manifest.json", JSON.stringify({ css: `/grok1/assets/${css}`, parts }));
+writeFileSync("published/manifest.json", JSON.stringify({ css: `/grok-travel-1/assets/${css}`, parts }));
 // Static pages (privacy, terms, logo) also live at the repo root for branch-served Pages.
 for (const f of ["privacy.html", "terms.html", "logo-120.png", "logo.png"]) copyFileSync(`public/${f}`, f);
 console.log(`published ${parts.length} parts, css ${css}`);

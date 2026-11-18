@@ -11,6 +11,7 @@
 :root[data-theme="dark"] .tr-pill.live { background: #12301d; color: #7ddc9c; }
 :root[data-theme="dark"] .tr-pill.off { background: #3a1714; color: #ffb4ab; }
 @keyframes tr-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .tr-pill.live i { animation: none; } }
 .tr-map { height: 340px; border-radius: 10px; overflow: hidden; border: 1px solid var(--color-border); z-index: 0; }
 .tr-bus span { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 20px; padding: 0 5px; border-radius: 6px; color: #fff; font: 700 11px/1 -apple-system, sans-serif; border: 1.5px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / 35%); }
 .tr-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }

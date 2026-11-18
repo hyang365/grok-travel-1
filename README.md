@@ -4,7 +4,7 @@ https://github.com/user-attachments/assets/dbe7f935-b0db-4791-8db4-5b6a8971673f
 
 # Run
 
-https://hyang365.github.io/grok1/
+https://hyang365.github.io/grok-travel-1/
 
 # TripTable
 
@@ -33,7 +33,7 @@ The site is connected to the Supabase project `triptable` (`yzldywaosqijduvtqvnb
 
 - **Live transit relay:** deployed as the `transit` edge function (`supabase/functions/transit`). Each deploy logs a check of every feed in the "Publish GitHub Pages" run.
 - **Reviews:** tables and row-level security from `supabase/schema.sql` are applied. Anyone can read; only signed-in @yale.edu accounts can post, edit or delete their own reviews; reports go to `review_reports` for you to moderate in the dashboard.
-- **Sign-in links:** Site URL is `https://hyang365.github.io/grok1/` and `https://hyang365.github.io/grok1/**` is an allowed redirect ([URL Configuration](https://supabase.com/dashboard/project/yzldywaosqijduvtqvnb/auth/url-configuration)). If the site moves to a new domain, add it there.
+- **Sign-in links:** Site URL is `https://hyang365.github.io/grok-travel-1/` and these redirect URLs must be allowed ([URL Configuration](https://supabase.com/dashboard/project/yzldywaosqijduvtqvnb/auth/url-configuration)): `https://hyang365.github.io/grok-travel-1/**` and `https://hyang365.github.io/grok1/**`. Google sign-in from a host that is not on that list comes back as an error and never creates an account.
 - Supabase's built-in email sender is limited to a few sign-in emails an hour. For real use, add your own SMTP under Authentication → Emails.
 
 ## Live transit
@@ -48,7 +48,7 @@ Every count on the map, catalog and place panels ("12 planning", overlap with yo
 
 ## Accounts and friends
 
-New visitors are guests: no trips, no friends, nothing shared, everything kept in the browser. Signing in with a Yale Google account (or an email link) creates a TripTable account automatically: a database trigger adds a row to `profiles` for every new sign-in. From there:
+New visitors are guests: no trips, no friends, nothing shared, everything kept in the browser. Signing in with a new @yale.edu Google account (or an email link) creates a TripTable account: the app inserts a `profiles` row for that user (name and photo from Google when Google sends them). `supabase/accounts.sql` is the matching database trigger and row-level security, for a new project or if the live trigger is missing. From there:
 
 - **Profile:** name, college and class year, editable under Profile → Settings.
 - **Friends:** a request goes into `friendships` as pending, and the other person accepts it. Only accepted friends can read each other's `trips` (row-level security). `find_student()` looks people up by exact Yale email or NetID, so nobody can browse the student list.

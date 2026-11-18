@@ -18,11 +18,14 @@ export async function refreshPlans() {
     return;
   }
   const { data, error } = await supabase.rpc("plan_counts");
+  if (error || !Array.isArray(data)) {
+    snap = { ...snap, loaded: true, version: snap.version + 1 };
+    listeners.forEach((fn) => fn());
+    return;
+  }
   const counts = new Map<string, number>();
-  if (!error && Array.isArray(data)) {
-    for (const row of data as { place_id: string; season: string; year: number; plans: number }[]) {
-      counts.set(key(row.place_id, row.season, row.year), row.plans);
-    }
+  for (const row of data as { place_id: string; season: string; year: number; plans: number }[]) {
+    counts.set(key(row.place_id, row.season, row.year), row.plans);
   }
   snap = { counts, loaded: true, version: snap.version + 1 };
   listeners.forEach((fn) => fn());
@@ -93,25 +96,61 @@ export function useOverlap(placeId: string | null, start?: string, end?: string)
 // ---------- syncing your own trips (signed-in Yale accounts only) ----------
 type Row = { id: string; place_id: string; season: Season; start_date: string; end_date: string };
 
-let lastSynced = new Map<string, string>();
+const SYNCED_KEY = "triptable-synced-trip-ids";
 
-/** Push local trips to the database and remove ones you deleted. Returns trips that exist only remotely. */
-export async function syncTrips(trips: Trip[], userId: string): Promise<Row[]> {
+/** Trip ids this browser has successfully synced. Persisted so a reload still knows a missing id was deleted here, not added on another device. */
+function readSynced(): Set<string> {
+  try {
+    const raw = localStorage.getItem(SYNCED_KEY);
+    const data = raw ? (JSON.parse(raw) as unknown) : [];
+    return new Set(Array.isArray(data) ? data.filter((id): id is string => typeof id === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeSynced(ids: Iterable<string>) {
+  try {
+    localStorage.setItem(SYNCED_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* storage blocked */
+  }
+}
+
+let chain: Promise<Row[]> = Promise.resolve([]);
+
+async function syncOnce(trips: Trip[], userId: string): Promise<Row[]> {
   if (!supabase) return [];
   const sig = (t: { place_id: string; season: string; start_date: string; end_date: string }) => `${t.place_id}|${t.season}|${t.start_date}|${t.end_date}`;
   const { data, error } = await supabase.from("trips").select("id,place_id,season,start_date,end_date");
   if (error) return [];
+  const known = readSynced();
   const remote = new Map((data as Row[]).map((r) => [r.id, r]));
   const local = new Map(trips.map((t) => [t.id, { id: t.id, place_id: t.placeId, season: t.season, start_date: t.start, end_date: t.end }]));
 
+  const removed = [...remote.keys()].filter((id) => !local.has(id) && known.has(id));
+  if (removed.length) {
+    const { error: deleteError } = await supabase.from("trips").delete().in("id", removed);
+    if (deleteError) return [];
+  }
+
   const upserts = [...local.values()].filter((r) => !remote.has(r.id) || sig(remote.get(r.id)!) !== sig(r));
-  if (upserts.length) await supabase.from("trips").upsert(upserts.map((r) => ({ ...r, user_id: userId, updated_at: new Date().toISOString() })));
+  if (upserts.length) {
+    const { error: upsertError } = await supabase.from("trips").upsert(upserts.map((r) => ({ ...r, user_id: userId, updated_at: new Date().toISOString() })));
+    if (upsertError) return [];
+  }
 
-  // Only delete remote trips this device previously synced and has since removed.
-  const removed = [...remote.keys()].filter((id) => !local.has(id) && lastSynced.has(id));
-  if (removed.length) await supabase.from("trips").delete().in("id", removed);
-
-  lastSynced = new Map([...local.values()].map((r) => [r.id, sig(r)]));
+  writeSynced(local.keys());
   if (upserts.length || removed.length) void refreshPlans();
   return [...remote.values()].filter((r) => !local.has(r.id) && !removed.includes(r.id));
+}
+
+/** Push local trips to the database and remove ones you deleted. Returns trips that exist only remotely. */
+export function syncTrips(trips: Trip[], userId: string): Promise<Row[]> {
+  const run = chain.then(() => syncOnce(trips, userId));
+  chain = run.then(
+    () => [],
+    () => [],
+  );
+  return run;
 }

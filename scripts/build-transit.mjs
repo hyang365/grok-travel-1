@@ -82,7 +82,7 @@ function readZip(zip, file) {
 
 async function download(url, dir, name) {
   const path = join(dir, name);
-  const res = await fetch(url, { headers: { "User-Agent": "TripTable build (github.com/hyang365/grok1)" } });
+  const res = await fetch(url, { headers: { "User-Agent": "TripTable build (github.com/hyang365/grok-travel-1)" } });
   if (!res.ok) throw new Error(`${url} → ${res.status}`);
   writeFileSync(path, Buffer.from(await res.arrayBuffer()));
   return path;

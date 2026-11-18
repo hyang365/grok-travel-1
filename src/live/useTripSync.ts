@@ -15,18 +15,24 @@ export function useTripSync() {
 
   useEffect(() => {
     if (!userId) return;
+    const uid = userId;
+    let cancel = false;
+    async function push() {
+      const remoteOnly = await syncTrips(state.trips, uid);
+      if (cancel || !remoteOnly.length) return;
+      dispatch({
+        type: "mergeTrips",
+        trips: remoteOnly.map((r) => ({ id: r.id, placeId: r.place_id, season: r.season, start: r.start_date, end: r.end_date, note: "", friendNetids: [] })),
+      });
+    }
     if (timer.current) window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(async () => {
-      const remoteOnly = await syncTrips(state.trips, userId);
-      if (remoteOnly.length) {
-        dispatch({
-          type: "mergeTrips",
-          trips: remoteOnly.map((r) => ({ id: r.id, placeId: r.place_id, season: r.season, start: r.start_date, end: r.end_date, note: "", friendNetids: [] })),
-        });
-      }
-    }, 800);
+    timer.current = window.setTimeout(() => void push(), 800);
+    const flush = () => void push();
+    window.addEventListener("pagehide", flush);
     return () => {
+      cancel = true;
       if (timer.current) window.clearTimeout(timer.current);
+      window.removeEventListener("pagehide", flush);
     };
   }, [state.trips, userId, dispatch]);
 }
