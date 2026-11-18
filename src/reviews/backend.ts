@@ -4,10 +4,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 //   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY   (see supabase/schema.sql and README)
 // The project URL and anon key are public by design (they ship to every browser); row-level
 // security in supabase/schema.sql is what protects the data. Env vars override them.
-export const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined) || "https://yzldywaosqijduvtqvnb.supabase.co";
+export const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined) || "https://lerxldabvyqxixhfzdhc.supabase.co";
 export const SUPABASE_ANON_KEY =
   (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6bGR5d2Fvc3FpamR1dnRxdm5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ5Nzc4NDcsImV4cCI6MjExMDU1Mzg0N30.UDiCpTJu96YZzHxQ5Tx6jkAjuAC449IcrRjJyW6lxLs";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlcnhsZGFidnlxeGl4aGZ6ZGhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ5ODMyMTEsImV4cCI6MjExMDU1OTIxMX0.0oVxJk96Izdt5M_YbRHQfrUchkX1eStXkiWCfsSgvVw";
 const url = SUPABASE_URL;
 const key = SUPABASE_ANON_KEY;
 

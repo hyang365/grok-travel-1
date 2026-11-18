@@ -29,11 +29,11 @@ https://hyang365.github.io/grok-travel-1/
 
 ## Database (Supabase)
 
-The site is connected to the Supabase project `triptable` (`yzldywaosqijduvtqvnb`). Its URL and public anon key are built into `src/reviews/backend.ts`; they're meant to be public, and row-level security in `supabase/schema.sql` protects the data.
+The site is connected to the Supabase project `triptable` (`lerxldabvyqxixhfzdhc`) on your account. Its URL and public anon key are built into `src/reviews/backend.ts`; they're meant to be public, and row-level security in `supabase/schema.sql`, `supabase/accounts.sql`, and `supabase/social.sql` protects the data.
 
 - **Live transit relay:** deployed as the `transit` edge function (`supabase/functions/transit`). Each deploy logs a check of every feed in the "Publish GitHub Pages" run.
 - **Reviews:** tables and row-level security from `supabase/schema.sql` are applied. Anyone can read; only signed-in @yale.edu accounts can post, edit or delete their own reviews; reports go to `review_reports` for you to moderate in the dashboard.
-- **Sign-in links:** Site URL is `https://hyang365.github.io/grok-travel-1/` and these redirect URLs must be allowed ([URL Configuration](https://supabase.com/dashboard/project/yzldywaosqijduvtqvnb/auth/url-configuration)): `https://hyang365.github.io/grok-travel-1/**` and `https://hyang365.github.io/grok1/**`. Google sign-in from a host that is not on that list comes back as an error and never creates an account.
+- **Sign-in links:** Site URL is `https://hyang365.github.io/grok-travel-1/`. Allowed redirects are `https://hyang365.github.io/grok-travel-1/**`, `https://hyang365.github.io/grok1/**`, and local dev (`http://127.0.0.1:5173/**`). Google sign-in is enabled. The OAuth client's authorized redirect URI is `https://lerxldabvyqxixhfzdhc.supabase.co/auth/v1/callback`. The Google consent screen has to allow `@yale.edu` users. An internal or testing-only app only lets people in that Google Cloud organization sign in.
 - Supabase's built-in email sender is limited to a few sign-in emails an hour. For real use, add your own SMTP under Authentication → Emails.
 
 ## Live transit

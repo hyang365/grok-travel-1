@@ -1,4 +1,4 @@
--- TripTable shared database. Applied to project yzldywaosqijduvtqvnb as migration reviews_and_reports.
+-- TripTable shared database. Applied to project lerxldabvyqxixhfzdhc.
 -- To rebuild elsewhere, run once in the Supabase SQL editor (Dashboard → SQL → New query).
 -- Anyone can read reviews. Only signed-in @yale.edu accounts can write, and only their own.
 

@@ -40,8 +40,8 @@ jobs:
       - name: Check live transit relay and database (non-fatal)
         continue-on-error: true
         env:
-          SB_URL: https://yzldywaosqijduvtqvnb.supabase.co
-          SB_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6bGR5d2Fvc3FpamR1dnRxdm5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ5Nzc4NDcsImV4cCI6MjExMDU1Mzg0N30.UDiCpTJu96YZzHxQ5Tx6jkAjuAC449IcrRjJyW6lxLs
+          SB_URL: https://lerxldabvyqxixhfzdhc.supabase.co
+          SB_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlcnhsZGFidnlxeGl4aGZ6ZGhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ5ODMyMTEsImV4cCI6MjExMDU1OTIxMX0.0oVxJk96Izdt5M_YbRHQfrUchkX1eStXkiWCfsSgvVw
         run: |
           for f in ct-trips ct-vehicles mnr amtrak-station; do
             body=$(curl -sS -m 30 -H "Authorization: Bearer $SB_KEY" -H "apikey: $SB_KEY" "$SB_URL/functions/v1/transit?feed=$f" || echo '{"error":"curl failed"}')
