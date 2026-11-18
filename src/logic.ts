@@ -191,14 +191,13 @@ export function travelGuidance(iso: string): Guidance {
   };
 }
 
-export function passesFilters(place: Place, count: number, filters: Filters, season: Season): boolean {
+export function passesFilters(place: Place, count: number, filters: Filters): boolean {
   if (count <= 0) return false;
   if (count < filters.minYalies) return false;
   if (place.scores.overall + 1e-6 < filters.overall) return false;
   if (place.scores.affordability + 1e-6 < filters.affordability) return false;
   if (place.scores.safety + 1e-6 < filters.safety) return false;
   if (place.scores.beauty + 1e-6 < filters.beauty) return false;
-  if (filters.warmth > 0 && tempBand(averageTempC(place.lat, season)) < filters.warmth) return false;
   if (filters.features.length > 0 && !filters.features.some((id) => featureMatch(place, id))) return false;
   if (filters.continents.length > 0 && !continentsOf(place).some((name) => filters.continents.includes(name))) return false;
   if (filters.scope === "countries" && place.kind !== "country") return false;
@@ -218,7 +217,6 @@ export function filtersAreDefault(filters: Filters): boolean {
     filters.safety <= 1 &&
     filters.beauty <= 1 &&
     filters.minYalies <= 0 &&
-    filters.warmth <= 0 &&
     filters.features.length === 0 &&
     filters.continents.length === 0 &&
     filters.scope === "all"

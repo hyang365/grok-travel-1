@@ -16,5 +16,17 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      (function () {
+        var entry = document.querySelector('script[type="module"]');
+        var preview = location.search.indexOf("pagespreview=1") !== -1;
+        if (!entry || entry.getAttribute("src") !== "/src/main.tsx") return;
+        if (!preview && !location.hostname.endsWith("github.io")) return;
+        var loader = document.createElement("script");
+        loader.type = "module";
+        loader.src = "/grok1/published/boot.js";
+        document.body.appendChild(loader);
+      })();
+    </script>
   </body>
 </html>

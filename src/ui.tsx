@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
-import { FindFlightsButton } from "./flights/FlightsView";
 import { DIRECTORY, ME, PLACE_BY_ID, PLACES, SUGGESTED_NETIDS } from "./data";
 import {
   anonymousOverlap,
-  averageTempC,
   continentsOf,
   CONTINENTS,
   FEATURES,
@@ -14,11 +12,8 @@ import {
   parseISODate,
   ratingBand,
   seasonLabel,
-  tempBand,
-  TEMP_LABELS,
   travelGuidance,
   visitCount,
-  warmthLabel,
   CURRENT_YEAR,
   SEASONS,
 } from "./logic";
@@ -154,16 +149,6 @@ export function FilterRail({ open, onPick }: { open: boolean; onPick: () => void
           display={filters.minYalies === 0 ? "Any" : `≥ ${filters.minYalies}`}
           onChange={(value) => dispatch({ type: "patchFilters", patch: { minYalies: value } })}
         />
-        <Slider
-          label="Weather"
-          min={0}
-          max={5}
-          step={1}
-          value={filters.warmth}
-          display={warmthLabel(filters.warmth)}
-          onChange={(value) => dispatch({ type: "patchFilters", patch: { warmth: Math.round(value) } })}
-        />
-        <p className="fine">Typical {seasonLabel(state.season).toLowerCase()} weather, very cold to very hot. Generated from latitude, not a forecast.</p>
         <p className="field-label">Features</p>
         <div className="choice-row">
           {FEATURES.map((feature) => (
@@ -272,12 +257,8 @@ export function PlacePanel({ place }: { place: Place }) {
           </button>
         </div>
         <p className="blurb">{place.blurb}</p>
-        <TravelLinks name={place.name} />
-        <FindFlightsButton placeId={place.id} />
         <GuidanceNote iso={place.iso} />
-        <p className="fine">
-          {TEMP_LABELS[tempBand(averageTempC(place.lat, state.season))]} in {seasonLabel(state.season).toLowerCase()} · {continentsOf(place).join(" and ")}
-        </p>
+        <p className="fine">{continentsOf(place).join(" and ")}</p>
         <ul className="tags">
           {place.atlas ? <li className="tag atlas-tag">Micro</li> : null}
           {place.tags.map((tag) => (
@@ -444,7 +425,7 @@ function HistoryChart({ place, season }: { place: Place; season: Season }) {
   );
 }
 
-function PlanForm({ place }: { place: Place }) {
+function PlanForm({ place, onDone }: { place: Place; onDone?: () => void }) {
   const { state, dispatch } = useTripTable();
   const friends = useFriends();
   const existing = state.trips.find((trip) => trip.placeId === place.id);
@@ -496,6 +477,7 @@ function PlanForm({ place }: { place: Place }) {
             friendNetids: withIds,
           },
         });
+        onDone?.();
       }}
     >
       <label>
@@ -585,15 +567,22 @@ export function EmptyPanel({ geo }: { geo: { iso: string; name: string } }) {
         </div>
         <GuidanceNote iso={geo.iso} />
         <p className="guide">No Yale trips are logged here yet. The public map only colors places students have rated.</p>
-        <TravelLinks name={geo.name} />
       </div>
     </aside>
   );
 }
 
+function yalieBand(count: number): "great" | "good" | "ok" | "low" {
+  if (count >= 100) return "great";
+  if (count >= 40) return "good";
+  if (count >= 15) return "ok";
+  return "low";
+}
+
 export function CatalogView() {
   const { state, dispatch } = useTripTable();
   const { rows } = useCatalog();
+  const [adding, setAdding] = useState<Place | null>(null);
   return (
     <div className="catalog">
       {rows.length === 0 ? <p className="empty">Nothing clears these filters.</p> : null}
@@ -601,17 +590,18 @@ export function CatalogView() {
         <thead>
           <tr>
             <th>Place</th>
-            <th>Weather</th>
             <th>Yalies</th>
             <th>Overall</th>
+            <th>Afford</th>
+            <th>Safety</th>
+            <th>Beauty</th>
             <th>Yale rules</th>
-            <th>Go</th>
+            <th aria-label="Add" />
           </tr>
         </thead>
         <tbody>
           {rows.map(({ place, count }) => {
             const guidance = travelGuidance(place.iso);
-            const band = tempBand(averageTempC(place.lat, state.season));
             return (
               <tr key={place.id} className={state.selectedId === place.id ? "active" : ""} onClick={() => dispatch({ type: "select", id: place.id })}>
                 <td>
@@ -620,20 +610,53 @@ export function CatalogView() {
                     {continentsOf(place).join(" · ")} · {place.kind === "country" ? "Country" : "Spot"}
                   </span>
                 </td>
-                <td>{TEMP_LABELS[band]}</td>
-                <td>{count.toLocaleString("en-US")}</td>
+                <td>
+                  <span className={`rate ${yalieBand(count)}`}>{count.toLocaleString("en-US")}</span>
+                </td>
                 <td>
                   <Rating value={place.scores.overall} />
                 </td>
+                <td>
+                  <Rating value={place.scores.affordability} />
+                </td>
+                <td>
+                  <Rating value={place.scores.safety} />
+                </td>
+                <td>
+                  <Rating value={place.scores.beauty} />
+                </td>
                 <td>{guidance.level === "blocked" ? "Not sponsored" : guidance.level === "regional" ? "Partial ban" : "Waiver if sponsored"}</td>
-                <td onClick={(event) => event.stopPropagation()}>
-                  <TravelLinks name={place.name} />
+                <td>
+                  <button
+                    className="plus"
+                    type="button"
+                    aria-label={`Add ${place.name} to itinerary`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setAdding(place);
+                    }}
+                  >
+                    +
+                  </button>
                 </td>
               </tr>
             );
           })}
         </tbody>
       </table>
+      {adding ? (
+        <div className="modal-back" onClick={() => setAdding(null)}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="add-title" onClick={(event) => event.stopPropagation()}>
+            <div className="panel-head">
+              <h2 id="add-title">Add {adding.name}</h2>
+              <button className="icon-btn" type="button" aria-label="Close" onClick={() => setAdding(null)}>
+                ×
+              </button>
+            </div>
+            <PlanForm place={adding} onDone={() => setAdding(null)} />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -839,6 +862,7 @@ export function ItineraryView() {
                 <b>{overlap.count.toLocaleString("en-US")}</b> Yalies overlap these dates
                 {names.length ? `. With ${names.join(" and ")}` : ""}.
               </p>
+              <TravelLinks name={place.name} />
               <div className="plan-actions">
                 <button
                   type="button"
