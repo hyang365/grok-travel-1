@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "publish:fallback": "GITHUB_PAGES=true vite build && node scripts/publish-fallback.mjs"
   },
   "dependencies": {
     "@amcharts/amcharts5": "^5.13.5",
     "@amcharts/amcharts5-geodata": "^5.1.5",
+    "@supabase/supabase-js": "^2.119.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

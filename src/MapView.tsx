@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { COUNTRY_BY_ISO, PLACE_BY_ID, PLACES } from "./data";
 import { heatColor, seasonLabel, visitCount } from "./logic";
 import { useCatalog, useFriends, useTripTable } from "./store";
+import { ABROAD_CITIES, MAX_PROGRAMS_PER_COUNTRY, programsIn } from "./abroad/data";
 
 type PointDatum = {
   latitude: number;
@@ -13,6 +14,7 @@ type PointDatum = {
   tooltip: string;
   radius: number;
   fill: number;
+  iso?: string;
 };
 
 type Api = {
@@ -48,7 +50,10 @@ export function MapView() {
   const pointGuard = useRef(0);
   const zoomToken = useRef(0);
 
-  const panelOpen = Boolean(state.selectedId || state.emptyGeo);
+  const abroad = state.mapMode === "abroad";
+  const modeRef = useRef(state.mapMode);
+  modeRef.current = state.mapMode;
+  const panelOpen = abroad ? Boolean(state.abroadIso) : Boolean(state.selectedId || state.emptyGeo);
   const selected = state.selectedId ? PLACE_BY_ID.get(state.selectedId) : undefined;
 
   paintRef.current = () => {
@@ -57,6 +62,30 @@ export function MapView() {
     const dark = state.theme === "dark";
     const seasonName = seasonLabel(state.season);
     api.background.set("fill", am5.color(dark ? 0x121820 : 0xe8f1fb));
+    if (abroad) {
+      api.polygons.mapPolygons.each((polygon) => {
+        const ctx = polygon.dataItem?.dataContext as { id?: string; name?: string } | undefined;
+        const n = ctx?.id ? programsIn(ctx.id).length : 0;
+        const isSelected = Boolean(ctx?.id && ctx.id === state.abroadIso);
+        polygon.set("fill", am5.color(n ? heatColor(n, MAX_PROGRAMS_PER_COUNTRY, dark) : dark ? 0x2a2a2a : 0xf3f3f3));
+        polygon.set("stroke", am5.color(isSelected ? (dark ? 0xffffff : 0x141414) : dark ? 0x1a1a1a : 0xffffff));
+        polygon.set("strokeWidth", isSelected ? 1.8 : 0.55);
+        polygon.set("tooltipText", n ? `${ctx?.name ?? ""}\n${n} study abroad ${n === 1 ? "program" : "programs"}` : (ctx?.name ?? ""));
+      });
+      api.spots.data.setAll(
+        ABROAD_CITIES.map((city) => ({
+          latitude: city.lat,
+          longitude: city.lng,
+          placeId: "",
+          iso: city.iso,
+          tooltip: `${city.city}\n${city.programs.map((p) => p.name).join("\n")}`,
+          radius: (city.iso === state.abroadIso ? 7 : 5) + Math.min(5, city.programs.length),
+          fill: 0x0b3d91,
+        })),
+      );
+      api.pals.data.setAll([]);
+      return;
+    }
     api.polygons.mapPolygons.each((polygon) => {
       const ctx = polygon.dataItem?.dataContext as { id?: string; name?: string } | undefined;
       const country = ctx?.id ? COUNTRY_BY_ISO.get(ctx.id) : undefined;
@@ -139,6 +168,12 @@ export function MapView() {
     requestAnimationFrame(() => {
       if (token !== zoomToken.current || !apiRef.current?.ready) return;
       const chart = api.chart;
+      if (abroad) {
+        const item = state.abroadIso ? polygonItem(api.polygons, state.abroadIso) : undefined;
+        if (item) api.polygons.zoomToDataItem(item);
+        else if (state.homeTick > 0 || !state.abroadIso) chart.goHome(400);
+        return;
+      }
       if (state.emptyGeo) {
         const item = polygonItem(api.polygons, state.emptyGeo.iso);
         if (item) api.polygons.zoomToDataItem(item);
@@ -202,6 +237,10 @@ export function MapView() {
       if (Date.now() - pointGuard.current < 50) return;
       const ctx = event.target.dataItem?.dataContext as { id?: string; name?: string } | undefined;
       if (!ctx?.id) return;
+      if (modeRef.current === "abroad") {
+        dispatch({ type: "selectAbroad", iso: programsIn(ctx.id).length ? ctx.id : null });
+        return;
+      }
       const country = COUNTRY_BY_ISO.get(ctx.id);
       if (country) dispatch({ type: "select", id: country.id });
       else dispatch({ type: "selectEmpty", iso: ctx.id, name: ctx.name ?? ctx.id });
@@ -230,7 +269,8 @@ export function MapView() {
         circle.events.on("click", (event) => {
           pointGuard.current = Date.now();
           const ctx = event.target.dataItem?.dataContext as PointDatum | undefined;
-          if (ctx?.placeId) dispatch({ type: "select", id: ctx.placeId });
+          if (ctx?.iso) dispatch({ type: "selectAbroad", iso: ctx.iso });
+          else if (ctx?.placeId) dispatch({ type: "select", id: ctx.placeId });
         });
         return am5.Bullet.new(bulletRoot, { sprite: circle });
       });
@@ -260,11 +300,11 @@ export function MapView() {
 
   useEffect(() => {
     paintRef.current();
-  }, [state.theme, state.season, state.filters, state.showFriends, state.friendNetids, state.selectedId, passed, friends, maxCountry]);
+  }, [state.theme, state.season, state.filters, state.showFriends, state.friendNetids, state.selectedId, state.mapMode, state.abroadIso, passed, friends, maxCountry]);
 
   useEffect(() => {
     zoomRef.current();
-  }, [state.selectedId, state.emptyGeo, state.homeTick, panelOpen, selected]);
+  }, [state.selectedId, state.emptyGeo, state.homeTick, state.mapMode, state.abroadIso, panelOpen, selected]);
 
   return <div className="map" ref={hostRef} />;
 }

@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { ME } from "../data";
+import { useTripTable } from "../store";
 import { GRANTS, KIND_LABEL, PROGRAMS, REGIONS, grantsFor, type Program, type ProgramKind } from "./data";
-import { average, reviewStore, useReviews, type ProgramReview } from "./reviewStore";
+import { ReviewSection } from "../reviews/ReviewSection";
+import { PROGRAM_KEYS, averageOf, reviewsFor, useReviewStore, type Review } from "../reviews/store";
 import "./abroad.css";
 
 const KINDS: ProgramKind[] = ["yss", "london", "nonyale-summer", "term"];
@@ -12,12 +13,14 @@ function Stars({ value }: { value: number | null }) {
 }
 
 export function AbroadView() {
-  const reviews = useReviews();
+  const { reviews } = useReviewStore();
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<ProgramKind | "all">("all");
   const [region, setRegion] = useState<string>("all");
   const [grant, setGrant] = useState<string>("all");
-  const [selectedId, setSelectedId] = useState<string>(PROGRAMS[0].id);
+  const { state, dispatch } = useTripTable();
+  const selectedId = state.abroadProgramId ?? PROGRAMS[0].id;
+  const setSelectedId = (id: string) => dispatch({ type: "openProgram", id });
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -57,7 +60,7 @@ export function AbroadView() {
         <p className="fine">{rows.length} programs</p>
         <ul className="ab-rows">
           {rows.map((p) => {
-            const mine = reviews.filter((r) => r.programId === p.id);
+            const mine = reviewsFor(reviews, "program", p.id);
             return (
               <li key={p.id}>
                 <button type="button" className={p.id === selected.id ? "active" : ""} onClick={() => setSelectedId(p.id)}>
@@ -66,7 +69,7 @@ export function AbroadView() {
                     <span>{p.city}, {p.country} · {KIND_LABEL[p.kind]}</span>
                   </span>
                   <span className="ab-row-side">
-                    <Stars value={average(mine, "overall")} />
+                    <Stars value={averageOf(mine, "overall")} />
                     <span className="fine">{grantsFor(p).length} grants</span>
                   </span>
                 </button>
@@ -79,12 +82,13 @@ export function AbroadView() {
           Full Yale Study Abroad database ↗
         </a>
       </section>
-      <ProgramDetail program={selected} reviews={reviews.filter((r) => r.programId === selected.id)} />
+      <ProgramDetail program={selected} reviews={reviewsFor(reviews, "program", selected.id)} />
     </div>
   );
 }
 
-function ProgramDetail({ program, reviews }: { program: Program; reviews: ProgramReview[] }) {
+function ProgramDetail({ program, reviews }: { program: Program; reviews: Review[] }) {
+  const { dispatch } = useTripTable();
   const grants = grantsFor(program);
   return (
     <section className="ab-detail">
@@ -96,17 +100,11 @@ function ProgramDetail({ program, reviews }: { program: Program; reviews: Progra
         <div className="plan-actions">
           <a className="primary ab-link" href={program.url} target="_blank" rel="noreferrer">Program page ↗</a>
           <a className="textlink" href="https://studyabroad.yale.edu/node/97" target="_blank" rel="noreferrer">Deadlines</a>
+          <button className="textlink" type="button" onClick={() => { dispatch({ type: "setMapMode", mode: "abroad" }); dispatch({ type: "selectAbroad", iso: program.iso }); }}>
+            See on map
+          </button>
         </div>
       </header>
-
-      <div className="ab-scores">
-        {(["overall", "academics", "housing", "value"] as const).map((k) => (
-          <div key={k}>
-            <span className="field-label">{k[0].toUpperCase() + k.slice(1)}</span>
-            <Stars value={average(reviews, k)} />
-          </div>
-        ))}
-      </div>
 
       <h3>Grants you can apply for</h3>
       <ul className="ab-grants">
@@ -125,92 +123,13 @@ function ProgramDetail({ program, reviews }: { program: Program; reviews: Progra
       <p className="fine">Eligibility depends on your aid status and citizenship. Confirm on each grant's page before you apply.</p>
 
       <h3>Reviews ({reviews.length})</h3>
-      <ReviewForm program={program} />
-      {reviews.length === 0 ? <p className="empty">No reviews yet. If you went, you'd be the first.</p> : null}
-      <ul className="ab-reviews">
-        {reviews.map((r) => (
-          <li key={r.id}>
-            <div className="ab-grant-top">
-              <strong>{r.author}</strong>
-              <span className="fine">{r.term} {r.year} · {r.overall}/5</span>
-            </div>
-            <p className="fine">Academics {r.academics} · Housing {r.housing} · Value {r.value}</p>
-            <p>{r.text}</p>
-            {r.netid === ME.netid ? (
-              <button className="textlink danger" type="button" onClick={() => reviewStore.remove(r.id)}>Delete</button>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+      <ReviewSection
+        targetType="program"
+        targetId={program.id}
+        keys={PROGRAM_KEYS}
+        terms={program.terms}
+        prompt="Workload, instructors, housing, what you'd tell a friend before applying"
+      />
     </section>
-  );
-}
-
-function ReviewForm({ program }: { program: Program }) {
-  const [open, setOpen] = useState(false);
-  const [term, setTerm] = useState(program.terms[0]);
-  const [year, setYear] = useState(2026);
-  const [scores, setScores] = useState({ overall: 4, academics: 4, housing: 4, value: 4 });
-  const [text, setText] = useState("");
-  const [error, setError] = useState("");
-
-  if (!open) {
-    return <button className="primary ab-write" type="button" onClick={() => { setOpen(true); setTerm(program.terms[0]); }}>Write a review</button>;
-  }
-
-  return (
-    <form
-      className="ab-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (text.trim().length < 20) {
-          setError("Write at least a couple of sentences so it helps the next person.");
-          return;
-        }
-        reviewStore.add({
-          id: `rev-${Date.now()}`,
-          programId: program.id,
-          netid: ME.netid,
-          author: `${ME.college} '${ME.year.slice(2)}`,
-          term,
-          year,
-          ...scores,
-          text: text.trim(),
-          createdAt: new Date().toISOString(),
-        });
-        setText("");
-        setError("");
-        setOpen(false);
-      }}
-    >
-      <div className="ab-form-row">
-        <label>Term
-          <select value={term} onChange={(e) => setTerm(e.target.value)}>
-            {program.terms.map((t) => <option key={t}>{t}</option>)}
-          </select>
-        </label>
-        <label>Year
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-            {[2026, 2025, 2024, 2023, 2022].map((y) => <option key={y}>{y}</option>)}
-          </select>
-        </label>
-      </div>
-      <div className="ab-form-row">
-        {(Object.keys(scores) as (keyof typeof scores)[]).map((k) => (
-          <label key={k}>{k[0].toUpperCase() + k.slice(1)}
-            <select value={scores[k]} onChange={(e) => setScores({ ...scores, [k]: Number(e.target.value) })}>
-              {[5, 4, 3, 2, 1].map((n) => <option key={n}>{n}</option>)}
-            </select>
-          </label>
-        ))}
-      </div>
-      <textarea rows={4} value={text} onChange={(e) => { setText(e.target.value); setError(""); }} placeholder="Workload, instructors, housing, what you'd tell a friend before applying" aria-label="Review" />
-      {error ? <p className="form-error">{error}</p> : null}
-      <p className="fine">Posted as "{ME.college} '{ME.year.slice(2)}". Your NetID isn't shown.</p>
-      <div className="plan-actions">
-        <button className="primary" type="submit">Post review</button>
-        <button className="textlink" type="button" onClick={() => setOpen(false)}>Cancel</button>
-      </div>
-    </form>
   );
 }

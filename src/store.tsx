@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, type Dispatch, type ReactNode } from "react";
 import { DIRECTORY, ME, PLACE_BY_ID } from "./data";
+import { useReviewStore } from "./reviews/store";
 import { passesFilters, sortScore, visitCount } from "./logic";
-import type { Filters, Person, Place, Season, Scope, SortKey, ThemeName, Trip, ViewName } from "./types";
+import type { Filters, MapMode, Person, Place, Season, Scope, SortKey, ThemeName, Trip, ViewName } from "./types";
 
 export const DEFAULT_FILTERS: Filters = {
   overall: 1,
@@ -32,6 +33,9 @@ export type State = {
   friendFocus: string | null;
   toast: string | null;
   homeTick: number;
+  mapMode: MapMode;
+  abroadIso: string | null;
+  abroadProgramId: string | null;
 };
 
 const SEASONS = new Set<Season>(["spring", "summer", "fall", "winter", "weekend"]);
@@ -67,6 +71,9 @@ function defaultState(): State {
     friendFocus: "jalva",
     toast: null,
     homeTick: 0,
+    mapMode: "travel",
+    abroadIso: null,
+    abroadProgramId: null,
   };
 }
 
@@ -116,6 +123,9 @@ function loadState(): State {
       toast: null,
       emptyGeo: null,
       homeTick: 0,
+      mapMode: data.mapMode === "abroad" ? "abroad" : "travel",
+      abroadIso: null,
+      abroadProgramId: typeof data.abroadProgramId === "string" ? data.abroadProgramId : null,
     };
   } catch {
     return base;
@@ -139,7 +149,10 @@ export type Action =
   | { type: "removeTrip"; id: string }
   | { type: "toast"; message: string }
   | { type: "clearToast" }
-  | { type: "reset" };
+  | { type: "reset" }
+  | { type: "setMapMode"; mode: MapMode }
+  | { type: "selectAbroad"; iso: string | null }
+  | { type: "openProgram"; id: string };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -170,6 +183,7 @@ function reducer(state: State, action: Action): State {
         selectedId: null,
         emptyGeo: null,
         homeTick: state.homeTick + 1,
+        abroadIso: null,
         filters: { ...state.filters, scope: "all" },
       };
     case "toggleFriends":
@@ -201,6 +215,12 @@ function reducer(state: State, action: Action): State {
       return { ...state, toast: action.message };
     case "clearToast":
       return { ...state, toast: null };
+    case "setMapMode":
+      return { ...state, mapMode: action.mode, view: "map", abroadIso: null, selectedId: null, emptyGeo: null };
+    case "selectAbroad":
+      return { ...state, abroadIso: action.iso, selectedId: null, emptyGeo: null };
+    case "openProgram":
+      return { ...state, view: "abroad", abroadProgramId: action.id };
     case "reset":
       localStorage.removeItem(STORAGE_KEY);
       return { ...defaultState(), toast: "Demo data restored" };
@@ -223,7 +243,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [state.theme]);
 
   useEffect(() => {
-    const { toast: _toast, emptyGeo: _empty, homeTick: _home, ...persist } = state;
+    const { toast: _toast, emptyGeo: _empty, homeTick: _home, abroadIso: _abroad, ...persist } = state;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(persist));
   }, [state]);
 
@@ -252,6 +272,7 @@ export function useCatalog(): {
   maxCountry: number;
 } {
   const { state } = useTripTable();
+  const { version } = useReviewStore();
   return useMemo(() => {
     const rows = [...PLACE_BY_ID.values()]
       .map((place) => ({ place, count: visitCount(place, state.season) }))
@@ -259,7 +280,7 @@ export function useCatalog(): {
     const direction = state.sortDir === "asc" ? 1 : -1;
     rows.sort((a, b) => {
       const primary =
-        state.sort === "yalies" ? a.count - b.count : sortScore(a.place.scores, state.sort) - sortScore(b.place.scores, state.sort);
+        state.sort === "yalies" ? a.count - b.count : sortScore(a.place.id, state.sort) - sortScore(b.place.id, state.sort);
       if (primary !== 0) return primary * direction;
       return (a.count - b.count) * direction || a.place.name.localeCompare(b.place.name);
     });
@@ -273,7 +294,7 @@ export function useCatalog(): {
       ...[...PLACE_BY_ID.values()].filter((place) => place.kind === "country").map((place) => visitCount(place, state.season)),
     );
     return { rows, passed, total, maxCountry };
-  }, [state.filters, state.season, state.sort, state.sortDir]);
+  }, [state.filters, state.season, state.sort, state.sortDir, version]);
 }
 
 export function useFriends(): Person[] {

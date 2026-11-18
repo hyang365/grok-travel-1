@@ -12,6 +12,7 @@ import {
   friendsAtPlace,
   parseISODate,
   ratingBand,
+  scoreOf,
   seasonLabel,
   travelGuidance,
   visitCount,
@@ -20,10 +21,15 @@ import {
 } from "./logic";
 import { DEFAULT_FILTERS, useCatalog, useFriends, useTripTable } from "./store";
 import type { Place, Season, SortKey } from "./types";
+import { ReviewSection } from "./reviews/ReviewSection";
+import { PLACE_KEYS, useReviewStore } from "./reviews/store";
 
-export function Rating({ value }: { value: number }) {
+export function Rating({ value }: { value: number | null }) {
+  if (value === null) return <span className="rate none" title="No reviews yet">—</span>;
   return <span className={`rate ${ratingBand(value)}`}>{value.toFixed(1)}</span>;
 }
+
+const fmt = (value: number | null) => (value === null ? "—" : value.toFixed(1));
 
 function Slider({
   label,
@@ -207,12 +213,12 @@ export function FilterRail({ open, onPick }: { open: boolean; onPick: () => void
               }}
             >
               <span className="row-name">{place.name}</span>
-              <Rating value={place.scores.overall} />
+              <Rating value={scoreOf(place.id, "overall")} />
               <span className="row-meta">
                 {count.toLocaleString("en-US")} Yalies · {parent ? parent.name : place.region}
               </span>
               <span className="row-scores">
-                Afford {place.scores.affordability.toFixed(1)} · Safety {place.scores.safety.toFixed(1)} · Beauty {place.scores.beauty.toFixed(1)}
+                Afford {fmt(scoreOf(place.id, "affordability"))} · Safety {fmt(scoreOf(place.id, "safety"))} · Beauty {fmt(scoreOf(place.id, "beauty"))}
               </span>
             </button>
           );
@@ -240,7 +246,6 @@ export function PlacePanel({ place }: { place: Place }) {
   const children = PLACES.filter((child) => child.parentId === place.id && visitCount(child, state.season) > 0).sort(
     (a, b) => visitCount(b, state.season) - visitCount(a, state.season),
   );
-  const comments = [...place.comments].sort((a, b) => Number(b.season === state.season) - Number(a.season === state.season) || b.year - a.year);
 
   return (
     <aside className="panel" aria-labelledby="place-title">
@@ -272,10 +277,10 @@ export function PlacePanel({ place }: { place: Place }) {
         <div className="scoregrid">
           {(
             [
-              ["Overall", place.scores.overall],
-              ["Afford", place.scores.affordability],
-              ["Safety", place.scores.safety],
-              ["Beauty", place.scores.beauty],
+              ["Overall", scoreOf(place.id, "overall")],
+              ["Afford", scoreOf(place.id, "affordability")],
+              ["Safety", scoreOf(place.id, "safety")],
+              ["Beauty", scoreOf(place.id, "beauty")],
             ] as const
           ).map(([label, value]) => (
             <div key={label}>
@@ -339,7 +344,7 @@ export function PlacePanel({ place }: { place: Place }) {
                   <button type="button" onClick={() => dispatch({ type: "select", id: child.id })}>
                     <span>{child.name}</span>
                     <span>{visitCount(child, state.season).toLocaleString("en-US")} Yalies</span>
-                    <Rating value={child.scores.overall} />
+                    <Rating value={scoreOf(child.id, "overall")} />
                   </button>
                 </li>
               ))}
@@ -349,7 +354,7 @@ export function PlacePanel({ place }: { place: Place }) {
         <div className="tabs" role="tablist">
           {(
             [
-              ["evals", "Evals"],
+              ["evals", "Reviews"],
               ["stays", "Stays"],
               ["history", "History"],
               ["plan", trip ? "Your plan" : "Plan"],
@@ -361,42 +366,30 @@ export function PlacePanel({ place }: { place: Place }) {
           ))}
         </div>
         {tab === "evals" ? (
-          <div className="stack">
-            {comments.map((entry) => (
-              <article key={entry.id} className="eval">
-                <header>
-                  <Rating value={entry.scores.overall} />
-                  <span>
-                    {seasonLabel(entry.season)} {entry.year}
-                  </span>
-                  <span className="dot">·</span>
-                  <span>
-                    {entry.college} '{entry.classYear}
-                  </span>
-                </header>
-                <p>{entry.text}</p>
-                <footer>
-                  Afford {entry.scores.affordability.toFixed(1)} · Safety {entry.scores.safety.toFixed(1)} · Beauty {entry.scores.beauty.toFixed(1)}
-                </footer>
-              </article>
-            ))}
-          </div>
+          <ReviewSection
+            targetType="place"
+            targetId={place.id}
+            keys={PLACE_KEYS}
+            terms={SEASONS.map((item) => item.label)}
+            prompt="Where you stayed, what it cost, how safe it felt, what you'd tell a friend going next"
+          />
         ) : null}
         {tab === "stays" ? (
+          <>
+          <p className="fine">Places to start looking. Prices are rough estimates, not quotes, and these aren't student reviews.</p>
           <ul className="stays">
             {place.stays.map((stay) => (
               <li key={stay.name}>
                 <div className="stay-top">
                   <strong>{stay.name}</strong>
-                  <Rating value={stay.rating} />
                 </div>
                 <div className="stay-meta">
                   {stay.area} · {stay.nightly === 0 ? "Free" : `${formatMoney(stay.nightly)} / night`}
                 </div>
-                <p>{stay.note}</p>
               </li>
             ))}
           </ul>
+          </>
         ) : null}
         {tab === "history" ? <HistoryChart place={place} season={state.season} /> : null}
         {tab === "plan" ? <PlanForm place={place} /> : null}
@@ -629,16 +622,16 @@ export function CatalogView() {
                   <span className={`rate ${yalieBand(count)}`}>{count.toLocaleString("en-US")}</span>
                 </td>
                 <td className="num">
-                  <Rating value={place.scores.overall} />
+                  <Rating value={scoreOf(place.id, "overall")} />
                 </td>
                 <td className="num">
-                  <Rating value={place.scores.affordability} />
+                  <Rating value={scoreOf(place.id, "affordability")} />
                 </td>
                 <td className="num">
-                  <Rating value={place.scores.safety} />
+                  <Rating value={scoreOf(place.id, "safety")} />
                 </td>
                 <td className="num">
-                  <Rating value={place.scores.beauty} />
+                  <Rating value={scoreOf(place.id, "beauty")} />
                 </td>
                 <td>{guidance.level === "blocked" ? "Not sponsored" : guidance.level === "regional" ? "Partial ban" : "Waiver if sponsored"}</td>
                 <td>
@@ -841,6 +834,7 @@ export function FriendsView() {
 
 export function ItineraryView() {
   const { state, dispatch } = useTripTable();
+  useReviewStore();
   const friends = useFriends();
   return (
     <div className="itinerary">
@@ -870,7 +864,7 @@ export function ItineraryView() {
                   <h3>{place.name}</h3>
                   <p>{formatRange(trip.start, trip.end)}</p>
                 </div>
-                <Rating value={place.scores.overall} />
+                <Rating value={scoreOf(place.id, "overall")} />
               </div>
               {trip.note ? <p>{trip.note}</p> : null}
               <p className="overlap-line">

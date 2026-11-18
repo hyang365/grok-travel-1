@@ -1,4 +1,5 @@
-import type { Filters, Person, PersonTrip, Place, Scores, Season, Trip } from "./types";
+import { placeScores, reviews } from "./reviews/store";
+import type { Filters, Person, PersonTrip, Place, Season, Trip } from "./types";
 
 export const CURRENT_YEAR = 2026;
 
@@ -194,10 +195,11 @@ export function travelGuidance(iso: string): Guidance {
 export function passesFilters(place: Place, count: number, filters: Filters): boolean {
   if (count <= 0) return false;
   if (count < filters.minYalies) return false;
-  if (place.scores.overall + 1e-6 < filters.overall) return false;
-  if (place.scores.affordability + 1e-6 < filters.affordability) return false;
-  if (place.scores.safety + 1e-6 < filters.safety) return false;
-  if (place.scores.beauty + 1e-6 < filters.beauty) return false;
+  for (const key of ["overall", "affordability", "safety", "beauty"] as const) {
+    if (filters[key] <= 1) continue;
+    const value = scoreOf(place.id, key);
+    if (value === null || value + 1e-6 < filters[key]) return false;
+  }
   if (filters.features.length > 0 && !filters.features.some((id) => featureMatch(place, id))) return false;
   if (filters.continents.length > 0 && !continentsOf(place).some((name) => filters.continents.includes(name))) return false;
   if (filters.scope === "countries" && place.kind !== "country") return false;
@@ -282,6 +284,13 @@ function mix(a: number, b: number, t: number): number {
   return (channel(16) << 16) + (channel(8) << 8) + channel(0);
 }
 
-export function sortScore(scores: Scores, sort: "overall" | "affordability" | "safety" | "beauty"): number {
-  return scores[sort];
+export type ScoreKey = "overall" | "affordability" | "safety" | "beauty";
+
+/** Average of real student reviews for a place, or null if nobody has reviewed it yet. */
+export function scoreOf(placeId: string, key: ScoreKey): number | null {
+  return placeScores(reviews.get().reviews, placeId)?.[key] ?? null;
+}
+
+export function sortScore(placeId: string, sort: ScoreKey): number {
+  return scoreOf(placeId, sort) ?? -1;
 }

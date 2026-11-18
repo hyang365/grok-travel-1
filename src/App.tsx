@@ -8,6 +8,8 @@ import { PLACE_BY_ID } from "./data";
 import { AveloToggle, FlightsView } from "./flights/FlightsView";
 import { LOGO } from "./logo";
 import { AbroadView } from "./abroad/AbroadView";
+import { AbroadMapPanel } from "./abroad/AbroadMapPanel";
+import "./abroad/abroad.css";
 
 function Shell() {
   const checked = useRef(false);
@@ -20,7 +22,8 @@ function Shell() {
   const [railOpen, setRailOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const selected = state.selectedId ? (PLACE_BY_ID.get(state.selectedId) ?? null) : null;
-  const panelOpen = Boolean(selected || state.emptyGeo);
+  const abroadMap = state.mapMode === "abroad";
+  const panelOpen = abroadMap ? Boolean(state.abroadIso) : Boolean(selected || state.emptyGeo);
 
   useEffect(() => {
     document.title = `TripTable · ${seasonLabel(state.season)}`;
@@ -131,28 +134,54 @@ function Shell() {
       </header>
 
       {state.view === "map" ? (
-        <div className="workspace">
-          <FilterRail open={railOpen} onPick={() => setRailOpen(false)} />
+        <div className={abroadMap ? "workspace no-rail" : "workspace"}>
+          {abroadMap ? null : <FilterRail open={railOpen} onPick={() => setRailOpen(false)} />}
           <div className={panelOpen ? "map-stage panel-open" : "map-stage"}>
             <MapView />
-            <div className="legend">
-              <div className="legend-title">{seasonLabel(state.season)} 2026</div>
-              <div className="legend-scale">
-                <span>Fewer</span>
-                <i className="legend-bar" />
-                <span>180+</span>
-              </div>
-              <div className="legend-total">
-                {total.toLocaleString("en-US")} {state.filters.scope === "us" ? "U.S. plans in view" : "anonymized plans"}
-              </div>
+            <div className="map-mode" role="group" aria-label="Map layer">
+              <button type="button" aria-pressed={!abroadMap} className={abroadMap ? "" : "active"} onClick={() => dispatch({ type: "setMapMode", mode: "travel" })}>
+                Travel
+              </button>
+              <button type="button" aria-pressed={abroadMap} className={abroadMap ? "active" : ""} onClick={() => dispatch({ type: "setMapMode", mode: "abroad" })}>
+                Study abroad
+              </button>
             </div>
+            {abroadMap ? (
+              <div className="legend">
+                <div className="legend-title">Study abroad programs</div>
+                <div className="legend-scale">
+                  <span>1</span>
+                  <i className="legend-bar" />
+                  <span>More</span>
+                </div>
+                <div className="legend-total">Yale Summer Session, Yale in London and approved programs</div>
+              </div>
+            ) : (
+              <div className="legend">
+                <div className="legend-title">{seasonLabel(state.season)} 2026</div>
+                <div className="legend-scale">
+                  <span>Fewer</span>
+                  <i className="legend-bar" />
+                  <span>180+</span>
+                </div>
+                <div className="legend-total">
+                  {total.toLocaleString("en-US")} {state.filters.scope === "us" ? "U.S. plans in view" : "plans"} · sample counts
+                </div>
+              </div>
+            )}
             <div className="map-actions">
               <button type="button" onClick={() => dispatch({ type: "world" })}>
                 World
               </button>
             </div>
-            {selected ? <PlacePanel place={selected} /> : null}
-            {state.emptyGeo ? <EmptyPanel geo={state.emptyGeo} /> : null}
+            {abroadMap ? (
+              state.abroadIso ? <AbroadMapPanel iso={state.abroadIso} /> : null
+            ) : (
+              <>
+                {selected ? <PlacePanel place={selected} /> : null}
+                {state.emptyGeo ? <EmptyPanel geo={state.emptyGeo} /> : null}
+              </>
+            )}
           </div>
         </div>
       ) : null}

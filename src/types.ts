@@ -18,22 +18,10 @@ export type Cohort = {
   count: number;
 };
 
-export type Comment = {
-  id: string;
-  season: Season;
-  year: number;
-  college: string;
-  classYear: string;
-  scores: Scores;
-  text: string;
-};
-
 export type Stay = {
   name: string;
   area: string;
   nightly: number;
-  rating: number;
-  note: string;
 };
 
 export type Place = {
@@ -47,11 +35,9 @@ export type Place = {
   region: string;
   blurb: string;
   guide: string;
-  scores: Scores;
   history: History;
   cohorts: Cohort[];
   stays: Stay[];
-  comments: Comment[];
   tags: string[];
   aliases: string[];
   atlas?: string;
@@ -76,6 +62,7 @@ export type Person = {
 export type Scope = "all" | "countries" | "us";
 export type SortKey = "yalies" | "overall" | "affordability" | "safety" | "beauty";
 export type ThemeName = "light" | "dark";
+export type MapMode = "travel" | "abroad";
 export type ViewName = "map" | "catalog" | "friends" | "itinerary" | "flights" | "abroad";
 
 export type Filters = {

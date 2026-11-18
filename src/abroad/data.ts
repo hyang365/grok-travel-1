@@ -229,3 +229,49 @@ export function grantsFor(program: Program): Grant[] {
 }
 
 export const REGIONS: Program["region"][] = ["Europe", "Latin America", "Africa & Middle East", "East Asia", "Southeast Asia"];
+
+const CITY_COORDS: Record<string, [number, number]> = {
+  "Rio de Janeiro": [-22.91, -43.17],
+  Dubrovnik: [42.65, 18.09],
+  Quito: [-0.18, -78.47],
+  Paris: [48.86, 2.35],
+  Auvillar: [44.07, 0.9],
+  Batumi: [41.64, 41.64],
+  Berlin: [52.52, 13.4],
+  Florence: [43.77, 11.26],
+  Siena: [43.32, 11.33],
+  "Ifrane and Rabat": [34.02, -6.84],
+  Lima: [-12.05, -77.04],
+  Barcelona: [41.39, 2.17],
+  Bilbao: [43.26, -2.93],
+  Valencia: [39.47, -0.38],
+  Stockholm: [59.33, 18.07],
+  London: [51.51, -0.13],
+  Singapore: [1.35, 103.82],
+  Taipei: [25.03, 121.56],
+};
+
+export function coordsOf(program: Program): [number, number] | null {
+  return CITY_COORDS[program.city] ?? null;
+}
+
+export type AbroadCity = { key: string; city: string; iso: string; lat: number; lng: number; programs: Program[] };
+
+export const ABROAD_CITIES: AbroadCity[] = (() => {
+  const map = new Map<string, AbroadCity>();
+  for (const p of PROGRAMS) {
+    const c = coordsOf(p);
+    if (!c) continue;
+    const key = `${p.iso}-${p.city}`;
+    const entry = map.get(key) ?? { key, city: p.city, iso: p.iso, lat: c[0], lng: c[1], programs: [] };
+    entry.programs.push(p);
+    map.set(key, entry);
+  }
+  return [...map.values()];
+})();
+
+export function programsIn(iso: string): Program[] {
+  return PROGRAMS.filter((p) => p.iso === iso);
+}
+
+export const MAX_PROGRAMS_PER_COUNTRY = Math.max(1, ...[...new Set(PROGRAMS.map((p) => p.iso))].map((iso) => programsIn(iso).length));

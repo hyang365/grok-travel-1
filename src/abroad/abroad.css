@@ -59,3 +59,22 @@
   .ab-detail { overflow: visible; }
   .ab-scores { grid-template-columns: repeat(2, 1fr); }
 }
+.map-mode {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 99px;
+  padding: 3px;
+  box-shadow: var(--shadow);
+}
+.map-mode button { border: 0; background: transparent; border-radius: 99px; height: 30px; padding: 0 14px; font-weight: 600; color: var(--color-text-secondary); }
+.map-mode button.active { background: var(--color-primary); color: #fff; }
+.map-stage.panel-open .map-mode { left: calc((100% - 432px) / 2); }
+.ab-tag { text-transform: none; }
+.panel .ab-rows button { padding: 8px 6px; }
+.workspace.no-rail { grid-template-columns: 1fr; }
