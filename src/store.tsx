@@ -37,7 +37,7 @@ export type State = {
 const SEASONS = new Set<Season>(["spring", "summer", "fall", "winter", "weekend"]);
 const SORTS = new Set<SortKey>(["yalies", "overall", "affordability", "safety", "beauty"]);
 const SCOPES = new Set<Scope>(["all", "countries", "us"]);
-const VIEWS = new Set<ViewName>(["map", "catalog", "friends", "itinerary"]);
+const VIEWS = new Set<ViewName>(["map", "catalog", "friends", "itinerary", "flights"]);
 const FEATURE_IDS = new Set(["beach", "mountain", "city", "island", "desert", "food"]);
 const CONTINENT_NAMES = new Set(["North America", "Caribbean", "Central America", "South America", "Europe", "Africa", "Asia", "Oceania"]);
 
