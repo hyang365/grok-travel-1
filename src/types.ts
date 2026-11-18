@@ -76,7 +76,7 @@ export type Person = {
 export type Scope = "all" | "countries" | "us";
 export type SortKey = "yalies" | "overall" | "affordability" | "safety" | "beauty";
 export type ThemeName = "light" | "dark";
-export type ViewName = "map" | "catalog" | "friends" | "itinerary" | "flights";
+export type ViewName = "map" | "catalog" | "friends" | "itinerary" | "flights" | "abroad";
 
 export type Filters = {
   overall: number;
